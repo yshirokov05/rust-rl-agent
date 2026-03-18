@@ -295,3 +295,100 @@ Logging to runs/v1_2\PPO_4
 [Wed Mar 18 16:29:44 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 14900
 [Wed Mar 18 16:29:54 2026] Groundbreaker: Low Health - Recovering | Reward: 100.4 | Total Steps: 15000
 [Wed Mar 18 16:30:04 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 15100
+[Wed Mar 18 16:30:14 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 15200
+[Wed Mar 18 16:30:24 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 15300
+[Wed Mar 18 16:30:35 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 15400
+[Wed Mar 18 16:30:45 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 15500
+[Wed Mar 18 16:30:55 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 15600
+[Wed Mar 18 16:31:05 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 15700
+[Wed Mar 18 16:31:16 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 15800
+[Wed Mar 18 16:31:26 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 15900
+[Wed Mar 18 16:31:36 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 16000
+[Wed Mar 18 16:31:46 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 16100
+[Wed Mar 18 16:31:56 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 16200
+[Wed Mar 18 16:32:07 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 16300
+------------------------------------------
+| rollout/                |              |
+|    ep_len_mean          | 2.05e+03     |
+|    ep_rew_mean          | 3.71e+03     |
+| time/                   |              |
+|    fps                  | 9            |
+|    iterations           | 8            |
+|    time_elapsed         | 1684         |
+|    total_timesteps      | 16384        |
+| train/                  |              |
+|    approx_kl            | 0.0055084014 |
+|    clip_fraction        | 0.0184       |
+|    clip_range           | 0.2          |
+|    entropy_loss         | -7.25        |
+|    explained_variance   | 0            |
+|    learning_rate        | 0.0003       |
+|    loss                 | -0.00312     |
+|    n_updates            | 70           |
+|    policy_gradient_loss | -0.00247     |
+|    std                  | 1.03         |
+|    value_loss           | 0.136        |
+------------------------------------------
+[Wed Mar 18 16:32:18 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 16400
+[Wed Mar 18 16:32:28 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 16500
+[Wed Mar 18 16:32:39 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 16600
+[Wed Mar 18 16:32:49 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 16700
+[Wed Mar 18 16:32:59 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 16800
+[Wed Mar 18 16:33:09 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 16900
+[Wed Mar 18 16:33:19 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 17000
+[Wed Mar 18 16:33:30 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 17100
+[Wed Mar 18 16:33:40 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 17200
+[Wed Mar 18 16:33:50 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 17300
+[Wed Mar 18 16:34:00 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 17400
+[Wed Mar 18 16:34:11 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 17500
+[Wed Mar 18 16:34:21 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 17600
+[Wed Mar 18 16:34:31 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 17700
+[Wed Mar 18 16:34:41 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 17800
+[Wed Mar 18 16:34:51 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 17900
+[Wed Mar 18 16:35:02 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 18000
+[Wed Mar 18 16:35:12 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 18100
+[Wed Mar 18 16:35:22 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 18200
+[Wed Mar 18 16:35:32 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 18300
+[Wed Mar 18 16:35:42 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 18400
+-------------------------------------------
+| rollout/                |               |
+|    ep_len_mean          | 2.05e+03      |
+|    ep_rew_mean          | 3.53e+03      |
+| time/                   |               |
+|    fps                  | 9             |
+|    iterations           | 9             |
+|    time_elapsed         | 1895          |
+|    total_timesteps      | 18432         |
+| train/                  |               |
+|    approx_kl            | 0.00025575908 |
+|    clip_fraction        | 0             |
+|    clip_range           | 0.2           |
+|    entropy_loss         | -7.23         |
+|    explained_variance   | 0             |
+|    learning_rate        | 0.0003        |
+|    loss                 | 3.2e+04       |
+|    n_updates            | 80            |
+|    policy_gradient_loss | 0.00148       |
+|    std                  | 1.03          |
+|    value_loss           | 4.84e+04      |
+-------------------------------------------
+[Wed Mar 18 16:35:54 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 18500
+[Wed Mar 18 16:36:04 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 18600
+[Wed Mar 18 16:36:14 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 18700
+[Wed Mar 18 16:36:25 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 18800
+[Wed Mar 18 16:36:35 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 18900
+[Wed Mar 18 16:36:45 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 19000
+[Wed Mar 18 16:36:55 2026] Groundbreaker: Low Health - Recovering | Reward: 100.4 | Total Steps: 19100
+[Wed Mar 18 16:37:06 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 19200
+[Wed Mar 18 16:37:16 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 19300
+[Wed Mar 18 16:37:26 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 19400
+[Wed Mar 18 16:37:36 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 19500
+[Wed Mar 18 16:37:46 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 19600
+[Wed Mar 18 16:37:57 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 19700
+[Wed Mar 18 16:38:07 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 19800
+[Wed Mar 18 16:38:17 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 19900
+[Wed Mar 18 16:38:27 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 20000
+[Wed Mar 18 16:38:37 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 20100
+[Wed Mar 18 16:38:48 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 20200
+[Wed Mar 18 16:38:58 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 20300
+[Wed Mar 18 16:39:08 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 20400

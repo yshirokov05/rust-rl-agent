@@ -5,7 +5,7 @@ setlocal
 set SERVER_ROOT=C:\Projects\rust-rl-agent\server\steamapps\common\rust_dedicated
 set IDENTITY=rust_server
 set SEED=12345
-set WORLDSIZE=3000
+set WORLDSIZE=1500
 set PORT=28015
 set RCON_PORT=28016
 set RCON_PASSWORD=antigravity

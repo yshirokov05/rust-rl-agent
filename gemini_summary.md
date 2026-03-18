@@ -1,24 +1,62 @@
 # Gemini Project Summary: Rust RL Agent
 
 ## Project Overview
-This repository contains the development environment for a Rust Reinforcement Learning agent. The goal is to train an agent to interact with the game Rust via a C# plugin and a Python-based RL environment.
+This repository contains the development environment for a Rust Reinforcement Learning agent. The goal is to train an agent to interact with the game Rust via a C# plugin and a Python-based RL environment. **No game client is needed** — a server-side bot handles everything autonomously.
 
 ## Latest Changes (2026-03-17)
-- **Project Recovery**: Repaired a corrupted Rust Dedicated Server installation by validating files via SteamCMD.
-- **Global Rules**: Established `global_rules.md` to grant the agent self-upgrade authority for complex tasks.
-- **Persistent Training**: 
-    - Integrated **Weights & Biases (W&B)** for cloud-synced metric tracking and model uploads.
-    - Implemented a robust **Resume Logic** in `train.py` that automatically loads `./models/latest.zip`.
-    - Added **Checkpointing** every 5,000 steps for crash recovery.
-- **Hardware Agnosticism**: Standardized the training script to use `device="auto"`, supporting both local AMD GPUs (DirectML) and Cloud NVIDIA GPUs (CUDA).
-- **Server Deployment**: Recreated `start_server.bat` and updated the `AgentEyes` plugin with correct relative data paths.
+- **Project Recovery**: Repaired Rust Dedicated Server via SteamCMD validation.
+- **Autonomous Bot**: Created `BotController.cs` — a Carbon plugin that spawns a server-side bot controlled by the Python agent via `actions.json` / `vision.json`. No Rust game client needed.
+- **Bidirectional Communication**: Python writes `actions.json` → Bot moves → Bot writes `vision.json` → Python reads observations.
+- **Persistent Training**: Integrated W&B (offline mode), checkpointing every 5000 steps, and automatic resume from `models/latest.zip`.
+- **Reward Shaping**: Agent is rewarded for approaching trees/ores and attacking when close.
+- **Map Size**: Reduced to 1500 for faster startup (~2 min vs crash on 3000).
 
-## Current State
-- **Server**: Ready for launch via `start_server.bat`.
-- **Agent**: Environment and dependencies are verified. Ready for training via `ai-agent/train.py`.
-- **Infrastructure**: Local training recommended for the PVE phase; cloud credits (Azure/GCP) staged for future hardware scaling.
+## Current State (PICK UP HERE TOMORROW)
+- **Server**: NOT running. Needs to be started.
+- **Plugins**: `BotController.cs` is deployed to Carbon plugins folder. `AgentEyes.cs` was removed (BotController handles vision).
+- **Agent**: `environment.py` and `train.py` are ready. Dependencies installed (wandb, tensorboard, stable-baselines3).
+- **Observation space**: 10 features (player XYZ, tree XYZ, ore XYZ, health).
 
-## Next Steps
-1. **Launch Server**: Start `start_server.bat` in the project root.
-2. **Execute Training**: Run `ai-agent/train.py` once the server is initialized.
-3. **Monitor W&B**: Track progress via the Weights & Biases dashboard.
+## TOMORROW: Step-by-Step Start Guide
+
+### Step 1: Start the Server
+```powershell
+cd C:\Projects\rust-rl-agent
+.\start_server.bat
+```
+Wait ~2 minutes for `Server startup complete` in the log. The BotController will automatically spawn a bot 5 seconds after server init.
+
+### Step 2: Verify the Bot Spawned
+Check the server log file for `BotController: Bot spawned at`:
+```powershell
+Get-Content -Path C:\Projects\rust-rl-agent\server\steamapps\common\rust_dedicated\rust_server.log -Tail 10
+```
+
+### Step 3: Start Training
+```powershell
+cd C:\Projects\rust-rl-agent
+.\venv\Scripts\python ai-agent/train.py
+```
+When W&B prompts, choose option 3 (offline) or log in with your account.
+
+### Step 4: Monitor
+- Checkpoints save to `ai-agent/models/checkpoints/`
+- Resume model: `ai-agent/models/latest.zip`
+- Server log: `server/steamapps/common/rust_dedicated/rust_server.log`
+
+## Key File Locations
+| File | Path |
+|------|------|
+| Server Start | `C:\Projects\rust-rl-agent\start_server.bat` |
+| Bot Plugin | `rust-plugin/BotController.cs` |
+| Vision Plugin | `rust-plugin/AgentEyes.cs` (kept as reference, NOT deployed) |
+| Environment | `ai-agent/environment.py` |
+| Training | `ai-agent/train.py` |
+| Vision Data | `shared-data/vision.json` |
+| Actions Data | `shared-data/actions.json` |
+
+## Next Steps (After Training Starts)
+1. Monitor W&B dashboard for learning curves.
+2. Build a 2D visualizer to watch the bot on a minimap.
+3. Scale to cloud (Azure $100 / GCP $300 student credits) for longer runs.
+4. Phase 2: Add combat + base building rewards.

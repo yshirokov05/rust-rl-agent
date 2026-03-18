@@ -1555,3 +1555,47 @@ Logging to runs/obw8d12f\PPO_5
 |    std                  | 0.855       |
 |    value_loss           | 3.47        |
 -----------------------------------------
+------------------------------------------
+| rollout/                |              |
+|    ep_len_mean          | 2.05e+03     |
+|    ep_rew_mean          | 1.4e+03      |
+| time/                   |              |
+|    fps                  | 9            |
+|    iterations           | 72           |
+|    time_elapsed         | 15474        |
+|    total_timesteps      | 147456       |
+| train/                  |              |
+|    approx_kl            | 0.0006513897 |
+|    clip_fraction        | 0            |
+|    clip_range           | 0.2          |
+|    entropy_loss         | -5.05        |
+|    explained_variance   | 0            |
+|    learning_rate        | 0.0003       |
+|    loss                 | 1.39e+03     |
+|    n_updates            | 710          |
+|    policy_gradient_loss | -0.000599    |
+|    std                  | 0.855        |
+|    value_loss           | 6.77e+03     |
+------------------------------------------
+------------------------------------------
+| rollout/                |              |
+|    ep_len_mean          | 2.05e+03     |
+|    ep_rew_mean          | 1.38e+03     |
+| time/                   |              |
+|    fps                  | 9            |
+|    iterations           | 73           |
+|    time_elapsed         | 15693        |
+|    total_timesteps      | 149504       |
+| train/                  |              |
+|    approx_kl            | 0.0031191683 |
+|    clip_fraction        | 0.00156      |
+|    clip_range           | 0.2          |
+|    entropy_loss         | -5.05        |
+|    explained_variance   | 1.19e-07     |
+|    learning_rate        | 0.0003       |
+|    loss                 | 79.7         |
+|    n_updates            | 720          |
+|    policy_gradient_loss | -0.00112     |
+|    std                  | 0.857        |
+|    value_loss           | 44.2         |
+------------------------------------------

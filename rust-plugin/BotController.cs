@@ -64,7 +64,7 @@ namespace Carbon.Plugins
                 Vector3 forward = _bot.transform.forward;
                 Vector3 right = _bot.transform.right;
 
-                float speedMult = actions.Sprint > 0.5f ? 1.7f : 1.0f;
+                float speedMult = actions.Sprint > 0.5f ? 1.4f : 1.0f;
                 Vector3 moveDir = (forward * actions.Forward + right * actions.Strafe).normalized;
                 Vector3 newPos = currentPos + moveDir * _moveSpeed * speedMult * 0.1f;
                 newPos.y = TerrainMeta.HeightMap.GetHeight(newPos);

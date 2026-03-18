@@ -130,7 +130,11 @@ class RustEnv(gym.Env):
             if min_dist < prev_min:
                 reward += 10.0  # Constant +10 for decreasing distance
             elif min_dist > prev_min:
-                reward -= 5.0   # Penalty for moving away
+                reward -= 1.0   # Reduced penalty for moving away while sprinting
+        
+        # Reward for being very close (encourages parking/staying)
+        if min_dist < 3.0:
+            reward += 0.5
 
         # Major bonus for successful "Hit" (+100 as requested)
         if has_gathered:

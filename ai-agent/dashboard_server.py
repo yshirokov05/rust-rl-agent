@@ -46,6 +46,29 @@ def get_last_logs(n=15):
     except:
         return ""
 
+@app.route("/command/<cmd>", methods=["POST"])
+def run_command(cmd):
+    try:
+        if cmd == "respawn":
+            # Just delete the actions file to force a reset if the bot is stuck or Kill the bot?
+            # Actually, the plugin respawns if _bot is dead.
+            # We can't easily kill the bot from here without RCON or a flag.
+            # Let's use a flag file.
+            with open(os.path.join(PROJECT_ROOT, "shared-data", "command.json"), "w") as f:
+                json.dump({"action": "respawn"}, f)
+            return jsonify({"status": "Respawn requested"})
+        
+        if cmd == "sync":
+            os.chdir(PROJECT_ROOT)
+            subprocess.run(["git", "add", "."], shell=True)
+            subprocess.run(["git", "commit", "-m", "Remote manual sync"], shell=True)
+            subprocess.run(["git", "push", "origin", "main"], shell=True)
+            return jsonify({"status": "Sync initiated"})
+            
+        return jsonify({"error": "Unknown command"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/data")
 def get_data():
     data = {
@@ -76,4 +99,4 @@ def index():
     return open(os.path.join(PROJECT_ROOT, "ai-agent", "dashboard.html")).read()
 
 if __name__ == "__main__":
-    app.run(port=8000, debug=False)
+    app.run(port=8080, debug=False)

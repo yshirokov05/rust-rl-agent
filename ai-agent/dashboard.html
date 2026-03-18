@@ -161,6 +161,14 @@
             <div class="stat-card"><span>Health</span><div id="stat-health">100%</div></div>
         </div>
 
+        <div class="card" style="margin-top: 1rem;">
+            <h2>REMOTE COMMAND CENTER</h2>
+            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <button onclick="sendCommand('respawn')" style="background: #ff4444; color: white; border: none; padding: 0.8rem; border-radius: 8px; font-weight: 600; cursor: pointer; flex: 1;">FORCE RESPAWN</button>
+                <button onclick="sendCommand('sync')" style="background: #4444ff; color: white; border: none; padding: 0.8rem; border-radius: 8px; font-weight: 600; cursor: pointer; flex: 1;">MANUAL SYNC</button>
+            </div>
+        </div>
+
         <div class="card" id="log-panel">
             <h2>Neural Log Output</h2>
             <div class="log-content" id="log-content">Initializing neural pathways...</div>
@@ -182,9 +190,19 @@
         let treeX = 0, treeZ = 0;
         let oreX = 0, oreZ = 0;
 
+        async function sendCommand(cmd) {
+            try {
+                const res = await fetch(`http://localhost:8080/command/${cmd}`, { method: 'POST' });
+                const data = await res.json();
+                alert(data.status || data.error);
+            } catch (e) {
+                alert("Command failed: " + e);
+            }
+        }
+
         async function update() {
             try {
-                const res = await fetch('http://localhost:8000/data');
+                const res = await fetch('http://localhost:8080/data');
                 const data = await res.json();
 
                 // Update Stats

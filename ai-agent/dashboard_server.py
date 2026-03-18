@@ -38,12 +38,15 @@ def parse_latest_stats():
     except:
         return {}
 
-def get_last_logs(n=15):
+def get_last_logs(n=20):
     if not os.path.exists(LOG_PATH):
-        return ""
+        return "Waiting for agent to start..."
     try:
         with open(LOG_PATH, "r") as f:
-            return "".join(f.readlines()[-n:])
+            lines = f.readlines()
+            # Only show lines containing "Groundbreaker" or errors
+            filtered = [l for l in lines if "Groundbreaker" in l or "Error" in l or "Traceback" in l]
+            return "".join(filtered[-n:])
     except:
         return ""
 

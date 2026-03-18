@@ -10,7 +10,7 @@ namespace Carbon.Plugins
     [Description("Extracts tree and ore locations for an AI agent.")]
     public class AgentEyes : CarbonPlugin
     {
-        private const string DataPath = "../shared-data/vision.json";
+        private const string DataPath = "../../../../../../shared-data/vision.json";
 
         private void Init()
         {

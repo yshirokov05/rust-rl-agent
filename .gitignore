@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Rust Server
+server/
+shared-data/vision.json
+
+# ML
+models/
+checkpoints/
+runs/
+wandb/
+
+# IDE
+.gemini/
+.vscode/
+.idea/
+*.swp
+*.swo

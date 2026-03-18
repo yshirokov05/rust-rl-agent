@@ -33,9 +33,9 @@ class RustEnv(gym.Env):
             with open(self.vision_path, 'r') as f:
                 data = json.load(f)
             
-            player = data.get('PlayerPosition', {'X': 0, 'Y': 0, 'Z': 0})
-            tree = data.get('NearestTree', {'X': 0, 'Y': 0, 'Z': 0})
-            ore = data.get('NearestOre', {'X': 0, 'Y': 0, 'Z': 0})
+            player = data.get('PlayerPosition') or {'X': 0, 'Y': 0, 'Z': 0}
+            tree = data.get('NearestTree') or {'X': 0, 'Y': 0, 'Z': 0}
+            ore = data.get('NearestOre') or {'X': 0, 'Y': 0, 'Z': 0}
 
             obs = np.array([
                 player['X'], player['Y'], player['Z'],
@@ -43,7 +43,8 @@ class RustEnv(gym.Env):
                 ore['X'], ore['Y'], ore['Z']
             ], dtype=np.float32)
             return obs
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError, PermissionError):
+            # PermissionError can happen if the plugin is writing while we read
             return np.zeros(9, dtype=np.float32)
 
     def reset(self, seed=None, options=None):
@@ -53,18 +54,24 @@ class RustEnv(gym.Env):
         return observation, info
 
     def step(self, action):
-        # In a real scenario, this would send actions to the game via a socket or similar.
-        # Here we just read the updated vision data.
+        # Action space: [Forward/Backward, Left/Right, Jump, Attack/Interact]
+        # In a real scenario, this would send actions to the game.
         
-        # Wait a bit to simulate game tick or wait for plugin update
-        # time.sleep(0.1) 
+        # Wait a bit to simulate game tick
+        time.sleep(0.05) 
 
         observation = self._get_obs()
         
-        # Simple reward: 1 if we are close to a tree or ore
-        # In practice, this would be much more complex.
-        reward = 0.0
+        # Simple reward: 1 / (distance to nearest tree or ore + 1)
+        tree_dist = np.linalg.norm(observation[3:6])
+        ore_dist = np.linalg.norm(observation[6:9])
         
+        # We want to minimize distance, so reward is inverse of distance
+        reward = 1.0 / (min(tree_dist, ore_dist) + 1.0)
+        
+        # Add a small penalty for each step to encourage efficiency
+        reward -= 0.01
+
         # Done condition (placeholder)
         terminated = False
         truncated = False

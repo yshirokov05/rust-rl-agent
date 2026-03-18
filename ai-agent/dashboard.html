@@ -187,14 +187,22 @@
                 const res = await fetch('http://localhost:8000/data');
                 const data = await res.json();
 
+                // Update Stats
                 if (data.stats) {
-                    document.getElementById('stat-reward').innerText = data.stats['ep_rew_mean'] || '---';
-                    document.getElementById('stat-steps').innerText = data.stats['total_timesteps'] || '---';
+                    const formatNum = (val) => {
+                        if (!val || val === '---') return '---';
+                        let n = Number(val);
+                        return isNaN(n) ? val : n.toLocaleString(undefined, {maximumFractionDigits: 0});
+                    };
+                    document.getElementById('stat-reward').innerText = formatNum(data.stats['ep_rew_mean']);
+                    document.getElementById('stat-steps').innerText = formatNum(data.stats['total_timesteps']);
                     document.getElementById('stat-fps').innerText = data.stats['fps'] || '---';
                 }
 
                 if (data.logs) {
-                    document.getElementById('log-content').innerText = data.logs;
+                    const logContainer = document.getElementById('log-content');
+                    logContainer.innerText = data.logs;
+                    logContainer.scrollTop = logContainer.scrollHeight;
                 }
 
                 if (data.vision && data.vision.PlayerPosition) {

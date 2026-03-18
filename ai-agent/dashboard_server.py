@@ -97,7 +97,11 @@ def get_data():
 
 @app.route("/")
 def index():
-    return open(os.path.join(PROJECT_ROOT, "ai-agent", "dashboard.html")).read()
+    try:
+        path = os.path.join(PROJECT_ROOT, "ai-agent", "dashboard.html")
+        return open(path, encoding='utf-8').read()
+    except Exception as e:
+        return f"Dashboard UI Error: {str(e)}", 500
 
 if __name__ == "__main__":
     app.run(port=8080, debug=False)

@@ -1,0 +1,79 @@
+import json
+import os
+import re
+from flask import Flask, jsonify
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)
+
+PROJECT_ROOT = "c:\\Projects\\rust-rl-agent"
+VISION_PATH = os.path.join(PROJECT_ROOT, "shared-data", "vision.json")
+LOG_PATH = os.path.join(PROJECT_ROOT, "train_output.log")
+STATE_PATH = os.path.join(PROJECT_ROOT, "project_state.json")
+
+def parse_latest_stats():
+    if not os.path.exists(LOG_PATH):
+        return {}
+    
+    try:
+        with open(LOG_PATH, "r") as f:
+            lines = f.readlines()
+        
+        stats = {}
+        table_found = False
+        for line in reversed(lines):
+            if "|" in line:
+                table_found = True
+                parts = [p.strip() for p in line.split("|") if p.strip()]
+                if len(parts) >= 2:
+                    key, value = parts[0], parts[1]
+                    if key not in stats:
+                        stats[key] = value
+            elif table_found:
+                if "iterations" in stats and "ep_rew_mean" in stats:
+                    break
+        return stats
+    except:
+        return {}
+
+def get_last_logs(n=15):
+    if not os.path.exists(LOG_PATH):
+        return ""
+    try:
+        with open(LOG_PATH, "r") as f:
+            return "".join(f.readlines()[-n:])
+    except:
+        return ""
+
+@app.route("/data")
+def get_data():
+    data = {
+        "vision": {},
+        "stats": parse_latest_stats(),
+        "state": {},
+        "logs": get_last_logs(15)
+    }
+    
+    if os.path.exists(VISION_PATH):
+        try:
+            with open(VISION_PATH, "r") as f:
+                data["vision"] = json.load(f)
+        except:
+            pass
+
+    if os.path.exists(STATE_PATH):
+        try:
+            with open(STATE_PATH, "r") as f:
+                data["state"] = json.load(f)
+        except:
+            pass
+            
+    return jsonify(data)
+
+@app.route("/")
+def index():
+    return open(os.path.join(PROJECT_ROOT, "ai-agent", "dashboard.html")).read()
+
+if __name__ == "__main__":
+    app.run(port=8000, debug=False)

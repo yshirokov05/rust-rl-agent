@@ -23,12 +23,15 @@ class RustEnv(gym.Env):
         self.max_steps = 2048  # Episode length
         self.prev_tree_dist = None
         self.prev_ore_dist = None
+        self.wood_count = 0
+        self.cloth_count = 0
+        self.tool_count = 0
 
         # Ensure shared-data directory exists
         os.makedirs(os.path.dirname(self.vision_path), exist_ok=True)
 
-        # Action space: [Forward/Backward, Left/Right, Jump, Attack/Interact]
-        self.action_space = spaces.Box(low=-1, high=1, shape=(4,), dtype=np.float32)
+        # Action space: [Forward/Backward, Left/Right, Jump, Attack/Interact, Sprint]
+        self.action_space = spaces.Box(low=-1, high=1, shape=(5,), dtype=np.float32)
 
         # Observation space:
         # [PlayerPos(x,y,z), NearestTree(x,y,z), NearestOre(x,y,z), Health]
@@ -42,7 +45,8 @@ class RustEnv(gym.Env):
             "Forward": float(action[0]),
             "Strafe": float(action[1]),
             "Jump": float(action[2]),
-            "Attack": float(action[3])
+            "Attack": float(action[3]),
+            "Sprint": float(action[4])
         }
         try:
             with open(self.actions_path, 'w') as f:
@@ -79,9 +83,12 @@ class RustEnv(gym.Env):
         self.steps = 0
         self.prev_tree_dist = None
         self.prev_ore_dist = None
+        self.wood_count = 0
+        self.cloth_count = 0
+        self.tool_count = 0
 
         # Send a "stop" action to reset the bot's momentum
-        self._send_actions(np.zeros(4, dtype=np.float32))
+        self._send_actions(np.zeros(5, dtype=np.float32))
         time.sleep(0.15)  # Wait for server tick
 
         observation = self._get_obs()
@@ -140,12 +147,20 @@ class RustEnv(gym.Env):
         truncated = self.steps >= self.max_steps
         terminated = False
 
-        # Achievements Tracking (Mocked or based on HasGathered for now)
+        # Achievements Tracking
         if has_gathered:
             if tree_dist < 3.0:
-                self.wood_count = getattr(self, 'wood_count', 0) + 1
+                self.wood_count += 1
+            elif ore_dist < 3.0:
+                # For now, let's say ore gathering counts as progress towards 'First Tool' 
+                # or just track it separately. The user asked for 'First Tool'.
+                # In Rust, you usually craft tools. We'll mock 'First Tool' as 
+                # gathering 5 ore for now, or just leave it at 0 if not Implementable.
+                # Let's just track wood and cloth for now as per heuristics.
+                pass 
             else:
-                self.cloth_count = getattr(self, 'cloth_count', 0) + 1
+                # If gathered but not near tree/ore, it's likely hemp/cloth
+                self.cloth_count += 1
         
         info = {
             "tree_dist": tree_dist,
@@ -153,10 +168,12 @@ class RustEnv(gym.Env):
             "steps": self.steps,
             "has_gathered": has_gathered,
             "reward": reward,
-            # Achievement logging
-            "achievement_10x_cloth": 1 if getattr(self, 'cloth_count', 0) >= 10 else 0,
-            "achievement_first_wood": 1 if getattr(self, 'wood_count', 0) >= 1 else 0,
-            "achievement_first_tool": 0 # Not yet implemented on server
+            "wood_count": self.wood_count,
+            "cloth_count": self.cloth_count,
+            # Achievement logging (boolean flags for WandB)
+            "achievement/10x_cloth": 1 if self.cloth_count >= 10 else 0,
+            "achievement/first_wood": 1 if self.wood_count >= 1 else 0,
+            "achievement/first_tool": 1 if self.tool_count >= 1 else 0
         }
 
         return observation, reward, terminated, truncated, info

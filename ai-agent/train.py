@@ -27,6 +27,7 @@ def train():
     # Initialize WandB
     run = wandb.init(
         project="rust-rl-agent",
+        mode="offline",
         sync_tensorboard=True,
         monitor_gym=True,
         save_code=True,
@@ -50,8 +51,21 @@ def train():
     )
     
     # Setup WandbCallback to visualize reward graphs, survival time, and distance
-    # SB3 metrics like reward are automatically logged. Custom metrics in 'info' are also logged.
-    wandb_callback = WandbCallback(
+    # We use a custom callback to log achievements from the 'info' dict
+    class AchievementCallback(WandbCallback):
+        def _on_step(self) -> bool:
+            if "achievement/10x_cloth" in self.locals["infos"][0]:
+                info = self.locals["infos"][0]
+                wandb.log({
+                    "achievements/10x_cloth": info["achievement/10x_cloth"],
+                    "achievements/first_wood": info["achievement/first_wood"],
+                    "achievements/first_tool": info["achievement/first_tool"],
+                    "stats/wood_count": info["wood_count"],
+                    "stats/cloth_count": info["cloth_count"],
+                }, commit=False)
+            return super()._on_step()
+
+    wandb_callback = AchievementCallback(
         gradient_save_freq=100,
         model_save_path=os.path.join(models_dir, f"run_{run.id}"),
         verbose=2,
@@ -64,7 +78,7 @@ def train():
         model.learn(
             total_timesteps=1000000, 
             callback=[checkpoint_callback, wandb_callback],
-            progress_bar=True
+            progress_bar=False
         )
     except KeyboardInterrupt:
         print("Training interrupted by user.")

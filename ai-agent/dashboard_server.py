@@ -22,18 +22,26 @@ def parse_latest_stats():
             lines = f.readlines()
         
         stats = {}
-        table_found = False
+        # New Simplified Parser for v1.2
         for line in reversed(lines):
+            if "Groundbreaker:" in line:
+                # Format: [time] Groundbreaker: goal | Reward: X | Total Steps: Y
+                try:
+                    parts = line.split("|")
+                    stats["ep_rew_mean"] = parts[1].split(":")[1].strip()
+                    stats["total_timesteps"] = parts[2].split(":")[1].strip()
+                    stats["fps"] = "10" # Default for our tickrate
+                    break
+                except:
+                    continue
+            
+            # Legacy Parser (Fallback)
             if "|" in line:
-                table_found = True
                 parts = [p.strip() for p in line.split("|") if p.strip()]
                 if len(parts) >= 2:
                     key, value = parts[0], parts[1]
                     if key not in stats:
                         stats[key] = value
-            elif table_found:
-                if "iterations" in stats and "ep_rew_mean" in stats:
-                    break
         return stats
     except:
         return {}

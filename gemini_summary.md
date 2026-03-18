@@ -12,6 +12,12 @@ This repository contains the development environment for a Rust Reinforcement Le
 - **W&B Integration**: Project name updated to `rust-rl-agent`. Real-time tracking of achievements like `10x Cloth` and `First Wood`.
 - **Map Size**: Reduced to 1500 for faster startup (~2 min vs crash on 3000).
 
+## Current Status (2026-03-18)
+- **RL Training**: Restarted as v1.1 with optimized sprint (1.4x) and reward shaping.
+- **Infrastructure**: Dashboard moved to port 8080.
+- **Remote Access**: Ready via Tailscale.
+- **Brain Sync**: `sync_brain.py` active, watching `checkpoints/` folder.
+
 ## Current State (PICK UP HERE)
 - **Server**: NOT running. Needs to be started.
 - **Plugins**: `BotController.cs` is deployed to Carbon plugins folder.

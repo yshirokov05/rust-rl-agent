@@ -40,7 +40,7 @@ def train():
         model = PPO.load(latest_model_path, env=env, device="auto")
     else:
         print("Starting new training session")
-        model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}", device="auto")
+        model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="runs/v1_2", device="auto")
     
     class SimpleLogCallback(CheckpointCallback):
         def _on_step(self) -> bool:

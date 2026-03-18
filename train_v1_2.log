@@ -1,9 +1,0 @@
-Starting new training session
-Traceback (most recent call last):
-  File "C:\Projects\rust-rl-agent\ai-agent\train.py", line 79, in <module>
-    train()
-    ~~~~~^^
-  File "C:\Projects\rust-rl-agent\ai-agent\train.py", line 43, in train
-    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"runs/{run.id}", device="auto")
-                                                                     ^^^
-NameError: name 'run' is not defined

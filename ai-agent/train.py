@@ -7,30 +7,33 @@ from environment import RustEnv
 import os
 import torch
 
+from stable_baselines3.common.monitor import Monitor
+
 def train():
     # Paths
     vision_path = "shared-data/vision.json"
     models_dir = "models"
     checkpoints_dir = os.path.join(models_dir, "checkpoints")
-    latest_model_path = os.path.join(models_dir, "latest.zip")
     
     # Ensure directories exist
     os.makedirs(models_dir, exist_ok=True)
     os.makedirs(checkpoints_dir, exist_ok=True)
     os.makedirs(os.path.dirname(vision_path), exist_ok=True)
     
-    # Create the environment
+    # Create the environment and wrap with Monitor
     env = RustEnv(vision_path=vision_path)
+    env = Monitor(env)
     
     # Initialize WandB
     run = wandb.init(
-        project="rust-agent",
+        project="rust-rl-agent",
         sync_tensorboard=True,
         monitor_gym=True,
         save_code=True,
     )
 
-    # Resume Logic
+    # Resume Logic (Check for latest_model.zip)
+    latest_model_path = os.path.join(models_dir, "latest_model.zip")
     if os.path.exists(latest_model_path):
         print(f"Resuming training from {latest_model_path}")
         model = PPO.load(latest_model_path, env=env, device="auto")
@@ -44,9 +47,10 @@ def train():
         save_path=checkpoints_dir,
         name_prefix="rust_rl_model",
         save_replay_buffer=True,
-        save_vecnormalize=True,
     )
     
+    # Setup WandbCallback to visualize reward graphs, survival time, and distance
+    # SB3 metrics like reward are automatically logged. Custom metrics in 'info' are also logged.
     wandb_callback = WandbCallback(
         gradient_save_freq=100,
         model_save_path=os.path.join(models_dir, f"run_{run.id}"),
@@ -56,7 +60,6 @@ def train():
     print("Starting training... (Wait for plugin to generate data)")
     
     # Train the agent
-    # Using a high number for total_timesteps as we rely on checkpoints/manual stop
     try:
         model.learn(
             total_timesteps=1000000, 
@@ -66,7 +69,7 @@ def train():
     except KeyboardInterrupt:
         print("Training interrupted by user.")
     finally:
-        # Save the final model as 'latest' for future resumes
+        # Save the final model as 'latest_model' for future resumes
         model.save(latest_model_path)
         print(f"Model saved to {latest_model_path}")
         wandb.finish()

@@ -132,12 +132,15 @@ namespace Carbon.Plugins
                 {
                     // Simulate a gather hit
                     entity.OnAttacked(new HitInfo(_bot, entity, DamageType.Slash, 50f));
+                    _hasGatheredThisTick = true;
                     break;
                 }
             }
 
             Facepunch.Pool.FreeUnmanaged(ref entities);
         }
+
+        private bool _hasGatheredThisTick = false;
 
         private void WriteVisionData()
         {
@@ -151,8 +154,10 @@ namespace Carbon.Plugins
                 NearestTree = GetNearestEntity(botPos, "tree"),
                 NearestOre = GetNearestEntity(botPos, "ore"),
                 Health = _bot.health,
-                HasGathered = false
+                HasGathered = _hasGatheredThisTick
             };
+
+            _hasGatheredThisTick = false; // Reset for next tick
 
             try
             {

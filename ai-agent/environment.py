@@ -100,6 +100,16 @@ class RustEnv(gym.Env):
         # Read the new observation
         observation = self._get_obs()
 
+        # Extract info from vision.json for rewards and achievements
+        has_gathered = False
+        try:
+            if os.path.exists(self.vision_path):
+                with open(self.vision_path, 'r') as f:
+                    data = json.load(f)
+                    has_gathered = data.get('HasGathered', False)
+        except:
+            pass
+
         # Calculate reward
         tree_dist = np.linalg.norm(observation[3:6])
         ore_dist = np.linalg.norm(observation[6:9])
@@ -107,22 +117,20 @@ class RustEnv(gym.Env):
 
         reward = 0.0
 
-        # Reward for getting closer to resources
+        # Reward for getting closer to resources (+10 as requested)
         if self.prev_tree_dist is not None:
             prev_min = min(self.prev_tree_dist, self.prev_ore_dist)
-            # Positive reward for moving closer, negative for moving away
-            reward += (prev_min - min_dist) * 0.5
+            if min_dist < prev_min:
+                reward += 10.0  # Constant +10 for decreasing distance
+            elif min_dist > prev_min:
+                reward -= 5.0   # Penalty for moving away
 
-        # Bonus for being very close to a resource (within gather range)
-        if min_dist < 3.0:
-            reward += 1.0
-
-        # Bonus for attacking when near a resource
-        if min_dist < 3.0 and action[3] > 0.5:
-            reward += 2.0
+        # Major bonus for successful "Hit" (+100 as requested)
+        if has_gathered:
+            reward += 100.0
 
         # Small step penalty to encourage efficiency
-        reward -= 0.01
+        reward -= 0.1
 
         # Update previous distances
         self.prev_tree_dist = tree_dist
@@ -132,10 +140,23 @@ class RustEnv(gym.Env):
         truncated = self.steps >= self.max_steps
         terminated = False
 
+        # Achievements Tracking (Mocked or based on HasGathered for now)
+        if has_gathered:
+            if tree_dist < 3.0:
+                self.wood_count = getattr(self, 'wood_count', 0) + 1
+            else:
+                self.cloth_count = getattr(self, 'cloth_count', 0) + 1
+        
         info = {
             "tree_dist": tree_dist,
             "ore_dist": ore_dist,
-            "steps": self.steps
+            "steps": self.steps,
+            "has_gathered": has_gathered,
+            "reward": reward,
+            # Achievement logging
+            "achievement_10x_cloth": 1 if getattr(self, 'cloth_count', 0) >= 10 else 0,
+            "achievement_first_wood": 1 if getattr(self, 'wood_count', 0) >= 1 else 0,
+            "achievement_first_tool": 0 # Not yet implemented on server
         }
 
         return observation, reward, terminated, truncated, info

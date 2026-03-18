@@ -166,7 +166,20 @@ class RustEnv(gym.Env):
                 # If gathered but not near tree/ore, it's likely hemp/cloth
                 self.cloth_count += 1
         
+        # Determine Current Goal
+        if health < 40.0:
+            goal = "Low Health - Recovering"
+        elif has_gathered:
+            goal = f"Successfully Harvested {observation[3:6] if tree_dist < ore_dist else observation[6:9]}"
+        elif min_dist < 3.0:
+            goal = f"Harvesting {'Tree' if tree_dist < ore_dist else 'Ore'}..."
+        elif min_dist < 15.0:
+            goal = f"Approaching {'Tree' if tree_dist < ore_dist else 'Ore'}..."
+        else:
+            goal = "Exploring Frontier..."
+
         info = {
+            "current_goal": goal,
             "tree_dist": tree_dist,
             "ore_dist": ore_dist,
             "steps": self.steps,

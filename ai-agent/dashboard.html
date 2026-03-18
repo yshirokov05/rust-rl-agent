@@ -229,20 +229,54 @@
                     
                     botX = v.PlayerPosition.X;
                     botZ = v.PlayerPosition.Z;
+
+                    // Official Nomenclature Mapping
+                    const nameMap = {
+                        'stone-ore': 'Stone Ore Node',
+                        'sulfur-ore': 'Sulfur Ore Node',
+                        'metal-ore': 'Metal Ore Node',
+                        'pine_sapling_e': 'Pine Tree',
+                        'pine_d': 'Pine Tree',
+                        'hemp-collectable': 'Hemp Fiber',
+                        'crate_shore': 'Loot Crate (Beach)'
+                    };
+
+                    const getFriendlyName = (raw) => {
+                        if (!raw) return "Exploring...";
+                        for (let key in nameMap) {
+                            if (raw.includes(key)) return nameMap[key];
+                        }
+                        return raw;
+                    };
                     
                     if (v.NearestTree && v.NearestTree.Position) {
                         treeX = botX + v.NearestTree.Position.X;
                         treeZ = botZ + v.NearestTree.Position.Z;
-                        treeName = v.NearestTree.Name;
+                        treeName = getFriendlyName(v.NearestTree.Name);
                         document.getElementById('legend-tree').innerText = treeName;
                     }
                     
                     if (v.NearestOre && v.NearestOre.Position) {
                         oreX = botX + v.NearestOre.Position.X;
                         oreZ = botZ + v.NearestOre.Position.Z;
-                        oreName = v.NearestOre.Name;
+                        oreName = getFriendlyName(v.NearestOre.Name);
                         document.getElementById('legend-ore').innerText = oreName;
                     }
+
+                    // Goal Tracking Logic
+                    const treeDist = v.NearestTree ? Math.sqrt(v.NearestTree.Position.X**2 + v.NearestTree.Position.Z**2) : 999;
+                    const oreDist = v.NearestOre ? Math.sqrt(v.NearestOre.Position.X**2 + v.NearestOre.Position.Z**2) : 999;
+                    const minDist = Math.min(treeDist, oreDist);
+                    const targetName = treeDist < oreDist ? treeName : oreName;
+
+                    let currentGoal = "Exploring Frontier...";
+                    if (v.Health < 40) currentGoal = "⚠️ Low Health - Fleeing!";
+                    else if (v.HasGathered) currentGoal = "✅ Successful Harvest!";
+                    else if (minDist < 3.0) currentGoal = `Harvesting ${targetName}...`;
+                    else if (minDist < 15.0) currentGoal = `Approaching ${targetName}...`;
+
+                    document.getElementById('bot-status').innerText = currentGoal;
+                    document.getElementById('bot-status').style.borderColor = v.HasGathered ? "#00ff88" : (v.Health < 40 ? "#ff4444" : "#00ff88");
                 }
 
                 draw();

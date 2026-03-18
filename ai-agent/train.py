@@ -1,4 +1,5 @@
 import gymnasium as gym
+import time
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from wandb.integration.sb3 import WandbCallback
@@ -49,7 +50,7 @@ def train():
                 goal = infos.get("current_goal", "Thinking...")
                 reward = infos.get("reward", 0.0)
                 steps = self.num_timesteps
-                print(f"[{time.ctime()}] Groundbreaker: {goal} | Reward: {reward:.1f} | Total Steps: {steps}")
+                print(f"[{time.ctime()}] Groundbreaker: {goal} | Reward: {reward:.1f} | Total Steps: {steps}", flush=True)
             return super()._on_step()
 
     simple_callback = SimpleLogCallback(

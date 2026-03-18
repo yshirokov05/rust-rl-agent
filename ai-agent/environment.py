@@ -167,6 +167,7 @@ class RustEnv(gym.Env):
                 self.cloth_count += 1
         
         # Determine Current Goal
+        health = observation[9] * 100.0
         if health < 40.0:
             goal = "Low Health - Recovering"
         elif has_gathered:

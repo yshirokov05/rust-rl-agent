@@ -10,7 +10,7 @@ CORS(app)
 
 PROJECT_ROOT = "c:\\Projects\\rust-rl-agent"
 VISION_PATH = os.path.join(PROJECT_ROOT, "shared-data", "vision.json")
-LOG_PATH = os.path.join(PROJECT_ROOT, "train_output_new.log")
+LOG_PATH = os.path.join(PROJECT_ROOT, "train_v1_2.log")
 STATE_PATH = os.path.join(PROJECT_ROOT, "project_state.json")
 
 def parse_latest_stats():

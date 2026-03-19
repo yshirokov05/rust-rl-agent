@@ -1,0 +1,74 @@
+
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta http-equiv="refresh" content="1">
+                <title>Rust RL Local Dashboard</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0e1117; color: white; padding: 20px; }
+                    .card { background: #1e2128; border-radius: 10px; padding: 20px; margin-bottom: 20px; border-left: 5px solid #4CAF50; }
+                    .metric { font-size: 24px; font-weight: bold; color: #4CAF50; }
+                    .label { font-size: 14px; color: #888; }
+                    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+                    .raw { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; overflow: auto; max-height: 200px; }
+                </style>
+            </head>
+            <body>
+                <h1>Rust RL Real-Time Monitor</h1>
+                <p>Last Update: 09:44:43</p>
+                
+                <div class="grid">
+                    <div class="card">
+                        <div class="label">Health</div>
+                        <div class="metric">100.0%</div>
+                    </div>
+                    <div class="card" style="border-left-color: #2196F3;">
+                        <div class="label">Position</div>
+                        <div class="metric">X: -353.3 Z: -142.9</div>
+                    </div>
+                    <div class="card" style="border-left-color: #FFEB3B;">
+                        <div class="label">Harvesting</div>
+                        <div class="metric">NO</div>
+                    </div>
+                </div>
+
+                <h3>Vision (Raw)</h3>
+                <div class="raw">{
+  "PlayerPosition": {
+    "X": -353.300232,
+    "Y": 35.06869,
+    "Z": -142.942322
+  },
+  "NearestTree": {
+    "Position": {
+      "X": -51.0980835,
+      "Y": -6.638706,
+      "Z": 11.8292389
+    },
+    "Name": "pine_sapling_e_snow"
+  },
+  "NearestOre": {
+    "Position": {
+      "X": -50.8156128,
+      "Y": -6.62857437,
+      "Z": 13.7436218
+    },
+    "Name": "stone-ore"
+  },
+  "Health": 100.0,
+  "HasGathered": false
+}</div>
+                
+                <h3>Actions (Raw)</h3>
+                <div class="raw">{
+  "MoveX": 0.0,
+  "MoveZ": 0.0,
+  "LookX": 0.0,
+  "LookY": 0.0,
+  "Sprint": false,
+  "Jump": false,
+  "Attack": false
+}</div>
+            </body>
+            </html>
+            

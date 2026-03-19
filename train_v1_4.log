@@ -1,0 +1,54 @@
+Resuming training from models\latest_model.zip
+Wrapping the env in a DummyVecEnv.
+Starting training... (Wait for plugin to generate data)
+Model saved to models\latest_model.zip
+Traceback (most recent call last):
+  File "C:\Projects\rust-rl-agent\ai-agent\train.py", line 90, in <module>
+    train()
+    ~~~~~^^
+  File "C:\Projects\rust-rl-agent\ai-agent\train.py", line 75, in train
+    model.learn(
+    ~~~~~~~~~~~^
+        total_timesteps=1000000,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        reset_num_timesteps=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Projects\rust-rl-agent\venv\Lib\site-packages\stable_baselines3\ppo\ppo.py", line 311, in learn
+    return super().learn(
+           ~~~~~~~~~~~~~^
+        total_timesteps=total_timesteps,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        progress_bar=progress_bar,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Projects\rust-rl-agent\venv\Lib\site-packages\stable_baselines3\common\on_policy_algorithm.py", line 311, in learn
+    total_timesteps, callback = self._setup_learn(
+                                ~~~~~~~~~~~~~~~~~^
+        total_timesteps,
+        ^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        progress_bar,
+        ^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Projects\rust-rl-agent\venv\Lib\site-packages\stable_baselines3\common\base_class.py", line 423, in _setup_learn
+    self._last_obs = self.env.reset()  # type: ignore[assignment]
+                     ~~~~~~~~~~~~~~^^
+  File "C:\Projects\rust-rl-agent\venv\Lib\site-packages\stable_baselines3\common\vec_env\dummy_vec_env.py", line 78, in reset
+    obs, self.reset_infos[env_idx] = self.envs[env_idx].reset(seed=self._seeds[env_idx], **maybe_options)
+                                     ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Projects\rust-rl-agent\venv\Lib\site-packages\stable_baselines3\common\monitor.py", line 83, in reset
+    return self.env.reset(**kwargs)
+           ~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Projects\rust-rl-agent\ai-agent\environment.py", line 93, in reset
+    self._send_actions(np.zeros(5, dtype=np.float32))
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Projects\rust-rl-agent\ai-agent\environment.py", line 51, in _send_actions
+    "Jump": action[5] > 0
+            ~~~~~~^^^
+IndexError: index 5 is out of bounds for axis 0 with size 5

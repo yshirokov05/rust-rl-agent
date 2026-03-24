@@ -1,0 +1,41 @@
+_wandb:
+    value:
+        cli_version: 0.25.1
+        e:
+            fqefu7c8yf1gfsjs2r1tjeuscnubymvp:
+                codePath: force_sync.py
+                codePathLocal: force_sync.py
+                cpu_count: 6
+                cpu_count_logical: 6
+                disk:
+                    /:
+                        total: "498657652736"
+                        used: "388218347520"
+                email: yshirokov05@gmail.com
+                executable: C:\Projects\rust-rl-agent\venv\Scripts\python.exe
+                git:
+                    commit: 1f8bb0559731c22c159a2c101444091eb2eec787
+                    remote: https://github.com/yshirokov05/rust-rl-agent
+                host: DESKTOP-LRTP7RS
+                memory:
+                    total: "34302423040"
+                os: Windows-11-10.0.26200-SP0
+                program: C:\Projects\rust-rl-agent\force_sync.py
+                python: CPython 3.12.6
+                root: C:\Projects\rust-rl-agent
+                startedAt: "2026-03-19T06:49:53.976611Z"
+                writerId: fqefu7c8yf1gfsjs2r1tjeuscnubymvp
+        m: []
+        python_version: 3.12.6
+        t:
+            "3":
+                - 2
+                - 5
+                - 14
+                - 62
+            "4": 3.12.6
+            "5": 0.25.1
+            "8":
+                - 3
+            "12": 0.25.1
+            "13": windows-amd64

@@ -1,0 +1,1286 @@
+warning: in the working copy of 'ai-agent/train.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'project_state.json', LF will be replaced by CRLF the next time Git touches it
+diff --git a/ai-agent/dashboard.html b/ai-agent/dashboard.html
+deleted file mode 100644
+index 665b3d9..0000000
+--- a/ai-agent/dashboard.html
++++ /dev/null
+@@ -1,329 +0,0 @@
+-<!DOCTYPE html>
+-<html lang="en">
+-<head>
+-    <meta charset="UTF-8">
+-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-    <title>Rust RL Agent | Groundbreaker Dashboard</title>
+-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+-    <style>
+-        :root {
+-            --bg-color: #050505;
+-            --card-bg: rgba(20, 20, 20, 0.7);
+-            --accent-color: #00ff88;
+-            --text-color: #e0e0e0;
+-            --text-dim: #999;
+-            --border: rgba(255, 255, 255, 0.1);
+-            --glass-blur: blur(12px);
+-        }
+-
+-        * {
+-            margin: 0;
+-            padding: 0;
+-            box-sizing: border-box;
+-            font-family: 'Inter', sans-serif;
+-        }
+-
+-        body {
+-            background-color: var(--bg-color);
+-            color: var(--text-color);
+-            overflow-x: hidden;
+-            display: flex;
+-            height: 100vh;
+-        }
+-
+-        /* Sidebar Interpretation Guide */
+-        aside {
+-            width: 350px;
+-            background: var(--card-bg);
+-            border-right: 1px solid var(--border);
+-            backdrop-filter: var(--glass-blur);
+-            padding: 2rem;
+-            display: flex;
+-            flex-direction: column;
+-            gap: 1.5rem;
+-            overflow-y: auto;
+-        }
+-
+-        h1 { font-size: 1.5rem; font-weight: 700; color: var(--accent-color); margin-bottom: 0.5rem; }
+-        h2 { font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+-
+-        .guide-item { margin-bottom: 1.5rem; }
+-        .guide-item strong { color: var(--accent-color); display: block; margin-bottom: 0.2rem; }
+-        .guide-item p { font-size: 0.85rem; color: var(--text-dim); line-height: 1.4; }
+-
+-        /* Main Content */
+-        main {
+-            flex: 1;
+-            padding: 2rem;
+-            display: grid;
+-            grid-template-areas: 
+-                "header header"
+-                "map stats"
+-                "map logs";
+-            grid-template-columns: 1fr 400px;
+-            grid-template-rows: auto 1fr 1.5fr;
+-            gap: 1.5rem;
+-        }
+-
+-        header { grid-area: header; display: flex; justify-content: space-between; align-items: center; }
+-        .status { padding: 0.4rem 1rem; border-radius: 20px; background: rgba(0, 255, 136, 0.1); border: 1px solid var(--accent-color); font-size: 0.8rem; font-weight: 600; }
+-
+-        .card {
+-            background: var(--card-bg);
+-            border: 1px solid var(--border);
+-            backdrop-filter: var(--glass-blur);
+-            border-radius: 12px;
+-            padding: 1.5rem;
+-        }
+-
+-        /* Map Area */
+-        #map-container {
+-            grid-area: map;
+-            position: relative;
+-            background: radial-gradient(circle at center, #111 0%, #050505 100%);
+-            display: flex;
+-            align-items: center;
+-            justify-content: center;
+-        }
+-        canvas {
+-            width: 100%;
+-            height: 100%;
+-            border-radius: 8px;
+-        }
+-
+-        /* Stats Grid */
+-        #stats-panel { grid-area: stats; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+-        .stat-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+-        .stat-card span { font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); }
+-        .stat-card div { font-size: 1.2rem; font-weight: 700; margin-top: 0.2rem; }
+-
+-        /* Log Panel */
+-        #log-panel { grid-area: logs; overflow: hidden; display: flex; flex-direction: column; }
+-        .log-content { flex: 1; font-family: 'Courier New', monospace; font-size: 0.8rem; color: #55ff55; opacity: 0.8; overflow-y: auto; padding-top: 1rem; }
+-
+-        .legend { position: absolute; bottom: 20px; left: 20px; display: flex; gap: 1rem; font-size: 0.7rem; }
+-        .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+-        .dot { width: 8px; height: 8px; border-radius: 50%; }
+-    </style>
+-</head>
+-<body>
+-    <aside>
+-        <h1>COMMANDER'S GUIDE</h1>
+-        
+-        <div class="guide-item">
+-            <strong>Reward Mean</strong>
+-            <p>The "Growth Score". If this is rising, the bot is successfully finding and hitting trees/ores.</p>
+-        </div>
+-
+-        <div class="guide-item">
+-            <strong>Total Steps</strong>
+-            <p>The "Age" of the model. Shows how much experience the bot has gathered in total.</p>
+-        </div>
+-
+-        <div class="guide-item">
+-            <strong>Neural Output</strong>
+-            <p>The "Bot's Mind". It tells you exactly which resource the bot is targeting and how much reward it just earned.</p>
+-        </div>
+-
+-        <div class="guide-item">
+-            <strong>Auto-Sync</strong>
+-            <p>Models are automatically pushed to GitHub every 15 minutes for your remote access.</p>
+-        </div>
+-    </aside>
+-
+-    <main>
+-        <header>
+-            <div>
+-                <h2>Training Phase</h2>
+-                <h1 style="color: white;">Groundbreaker v1.0</h1>
+-            </div>
+-            <div class="status" id="bot-status">BOT ACTIVE</div>
+-        </header>
+-
+-        <div class="card" id="map-container">
+-            <canvas id="mapCanvas"></canvas>
+-            <div class="legend">
+-                <div class="legend-item"><div class="dot" style="background: var(--accent-color);"></div> Bot</div>
+-                <div class="legend-item"><div class="dot" style="background: #8B4513;"></div> Nearest Tree: <span id="legend-tree">---</span></div>
+-                <div class="legend-item"><div class="dot" style="background: #808080;"></div> Nearest Ore: <span id="legend-ore">---</span></div>
+-            </div>
+-        </div>
+-
+-        <div id="stats-panel">
+-            <div class="stat-card"><span>Reward Mean</span><div id="stat-reward">0.0</div></div>
+-            <div class="stat-card"><span>Total Steps</span><div id="stat-steps">0</div></div>
+-            <div class="stat-card"><span>FPS</span><div id="stat-fps">0</div></div>
+-            <div class="stat-card"><span>Health</span><div id="stat-health">100%</div></div>
+-        </div>
+-
+-        <div class="card" style="margin-top: 1rem;">
+-            <h2>REMOTE COMMAND CENTER</h2>
+-            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+-                <button onclick="sendCommand('respawn')" style="background: #ff4444; color: white; border: none; padding: 0.8rem; border-radius: 8px; font-weight: 600; cursor: pointer; flex: 1;">FORCE RESPAWN</button>
+-                <button onclick="sendCommand('sync')" style="background: #4444ff; color: white; border: none; padding: 0.8rem; border-radius: 8px; font-weight: 600; cursor: pointer; flex: 1;">MANUAL SYNC</button>
+-            </div>
+-        </div>
+-
+-        <div class="card" id="log-panel">
+-            <h2>Neural Log Output</h2>
+-            <div class="log-content" id="log-content">Initializing neural pathways...</div>
+-        </div>
+-    </main>
+-
+-    <script>
+-        const canvas = document.getElementById('mapCanvas');
+-        const ctx = canvas.getContext('2d');
+-        
+-        function resize() {
+-            canvas.width = canvas.parentElement.clientWidth;
+-            canvas.height = canvas.parentElement.clientHeight;
+-        }
+-        window.onresize = resize;
+-        resize();
+-
+-        let botX = 0, botZ = 0;
+-        let treeX = 0, treeZ = 0;
+-        let oreX = 0, oreZ = 0;
+-
+-        async function sendCommand(cmd) {
+-            try {
+-                const res = await fetch(`http://localhost:8080/command/${cmd}`, { method: 'POST' });
+-                const data = await res.json();
+-                alert(data.status || data.error);
+-            } catch (e) {
+-                alert("Command failed: " + e);
+-            }
+-        }
+-
+-        async function update() {
+-            try {
+-                const res = await fetch('http://localhost:8080/data');
+-                const data = await res.json();
+-
+-                // Update Stats
+-                if (data.stats) {
+-                    const formatNum = (val) => {
+-                        if (!val || val === '---') return '---';
+-                        let n = Number(val);
+-                        return isNaN(n) ? val : n.toLocaleString(undefined, {maximumFractionDigits: 0});
+-                    };
+-                    document.getElementById('stat-reward').innerText = formatNum(data.stats['ep_rew_mean']);
+-                    document.getElementById('stat-steps').innerText = formatNum(data.stats['total_timesteps']);
+-                    document.getElementById('stat-fps').innerText = data.stats['fps'] || '---';
+-                }
+-
+-                if (data.logs) {
+-                    const logContainer = document.getElementById('log-content');
+-                    logContainer.innerText = data.logs;
+-                    logContainer.scrollTop = logContainer.scrollHeight;
+-                }
+-
+-                if (data.vision && data.vision.PlayerPosition) {
+-                    const v = data.vision;
+-                    document.getElementById('stat-health').innerText = v.Health.toFixed(1) + '%';
+-                    
+-                    botX = v.PlayerPosition.X;
+-                    botZ = v.PlayerPosition.Z;
+-
+-                    // Official Nomenclature Mapping
+-                    const nameMap = {
+-                        'stone-ore': 'Stone Ore Node',
+-                        'sulfur-ore': 'Sulfur Ore Node',
+-                        'metal-ore': 'Metal Ore Node',
+-                        'pine_sapling_e': 'Pine Tree',
+-                        'pine_d': 'Pine Tree',
+-                        'hemp-collectable': 'Hemp Fiber',
+-                        'crate_shore': 'Loot Crate (Beach)'
+-                    };
+-
+-                    const getFriendlyName = (raw) => {
+-                        if (!raw) return "Exploring...";
+-                        for (let key in nameMap) {
+-                            if (raw.includes(key)) return nameMap[key];
+-                        }
+-                        return raw;
+-                    };
+-                    
+-                    if (v.NearestTree && v.NearestTree.Position) {
+-                        treeX = botX + v.NearestTree.Position.X;
+-                        treeZ = botZ + v.NearestTree.Position.Z;
+-                        treeName = getFriendlyName(v.NearestTree.Name);
+-                        document.getElementById('legend-tree').innerText = treeName;
+-                    }
+-                    
+-                    if (v.NearestOre && v.NearestOre.Position) {
+-                        oreX = botX + v.NearestOre.Position.X;
+-                        oreZ = botZ + v.NearestOre.Position.Z;
+-                        oreName = getFriendlyName(v.NearestOre.Name);
+-                        document.getElementById('legend-ore').innerText = oreName;
+-                    }
+-
+-                    // Goal Tracking Logic
+-                    const treeDist = v.NearestTree ? Math.sqrt(v.NearestTree.Position.X**2 + v.NearestTree.Position.Z**2) : 999;
+-                    const oreDist = v.NearestOre ? Math.sqrt(v.NearestOre.Position.X**2 + v.NearestOre.Position.Z**2) : 999;
+-                    const minDist = Math.min(treeDist, oreDist);
+-                    const targetName = treeDist < oreDist ? treeName : oreName;
+-
+-                    let currentGoal = "Exploring Frontier...";
+-                    if (v.Health < 40) currentGoal = "⚠️ Low Health - Fleeing!";
+-                    else if (v.HasGathered) currentGoal = "✅ Successful Harvest!";
+-                    else if (minDist < 3.0) currentGoal = `Harvesting ${targetName}...`;
+-                    else if (minDist < 15.0) currentGoal = `Approaching ${targetName}...`;
+-
+-                    document.getElementById('bot-status').innerText = currentGoal;
+-                    document.getElementById('bot-status').style.borderColor = v.HasGathered ? "#00ff88" : (v.Health < 40 ? "#ff4444" : "#00ff88");
+-                }
+-
+-                draw();
+-            } catch (e) {
+-                console.error("Update failed", e);
+-            }
+-        }
+-
+-        let treeName = "Tree", oreName = "Ore";
+-
+-        function draw() {
+-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+-            
+-            const centerX = canvas.width / 2;
+-            const centerY = canvas.height / 2;
+-            const scale = 5; // Pixels per meter
+-
+-            // Helper to draw entities relative to center
+-            function drawDot(x, z, color, size, label) {
+-                const screenX = centerX + (x - botX) * scale;
+-                const screenZ = centerY - (z - botZ) * scale;
+-                
+-                ctx.fillStyle = color;
+-                ctx.beginPath();
+-                ctx.arc(screenX, screenZ, size, 0, Math.PI * 2);
+-                ctx.fill();
+-
+-                if (label && label !== "None") {
+-                    ctx.fillStyle = "white";
+-                    ctx.font = "10px Inter";
+-                    ctx.fillText(label, screenX + 10, screenZ + 5);
+-                }
+-            }
+-
+-            // Grid
+-            ctx.strokeStyle = "rgba(255,255,255,0.05)";
+-            for(let i = -1000; i < 1000; i += 50) {
+-                 ctx.beginPath(); ctx.moveTo(centerX + (i - (botX % 50))*scale, 0); ctx.lineTo(centerX + (i - (botX % 50))*scale, canvas.height); ctx.stroke();
+-                 ctx.beginPath(); ctx.moveTo(0, centerY - (i - (botZ % 50))*scale); ctx.lineTo(canvas.width, centerY - (i - (botZ % 50))*scale); ctx.stroke();
+-            }
+-
+-            // Draw Bot (Always at center)
+-            drawDot(botX, botZ, "#00ff88", 8, "RL_Agent");
+-            
+-            // Draw Tree
+-            drawDot(treeX, treeZ, "#8B4513", 6, treeName);
+-
+-            // Draw Ore
+-            drawDot(oreX, oreZ, "#808080", 6, oreName);
+-        }
+-
+-        setInterval(update, 500);
+-    </script>
+-</body>
+-</html>
+diff --git a/ai-agent/dashboard_server.py b/ai-agent/dashboard_server.py
+deleted file mode 100644
+index 1c48f13..0000000
+--- a/ai-agent/dashboard_server.py
++++ /dev/null
+@@ -1,118 +0,0 @@
+-import json
+-import os
+-import re
+-import subprocess
+-from flask import Flask, jsonify
+-from flask_cors import CORS
+-
+-app = Flask(__name__)
+-CORS(app)
+-
+-PROJECT_ROOT = "c:\\Projects\\rust-rl-agent"
+-VISION_PATH = os.path.join(PROJECT_ROOT, "shared-data", "vision.json")
+-LOG_PATH = os.path.join(PROJECT_ROOT, "train_v1_2.log")
+-STATE_PATH = os.path.join(PROJECT_ROOT, "project_state.json")
+-
+-def parse_latest_stats():
+-    if not os.path.exists(LOG_PATH):
+-        return {}
+-    
+-    try:
+-        with open(LOG_PATH, "r") as f:
+-            lines = f.readlines()
+-        
+-        stats = {}
+-        # New Simplified Parser for v1.2
+-        for line in reversed(lines):
+-            if "Groundbreaker:" in line:
+-                # Format: [time] Groundbreaker: goal | Reward: X | Total Steps: Y
+-                try:
+-                    parts = line.split("|")
+-                    stats["ep_rew_mean"] = parts[1].split(":")[1].strip()
+-                    stats["total_timesteps"] = parts[2].split(":")[1].strip()
+-                    stats["fps"] = "10" # Default for our tickrate
+-                    break
+-                except:
+-                    continue
+-            
+-            # Legacy Parser (Fallback)
+-            if "|" in line:
+-                parts = [p.strip() for p in line.split("|") if p.strip()]
+-                if len(parts) >= 2:
+-                    key, value = parts[0], parts[1]
+-                    if key not in stats:
+-                        stats[key] = value
+-        return stats
+-    except:
+-        return {}
+-
+-def get_last_logs(n=20):
+-    if not os.path.exists(LOG_PATH):
+-        return "Waiting for agent to start..."
+-    try:
+-        with open(LOG_PATH, "r") as f:
+-            lines = f.readlines()
+-            # Only show lines containing "Groundbreaker" or errors
+-            filtered = [l for l in lines if "Groundbreaker" in l or "Error" in l or "Traceback" in l]
+-            return "".join(filtered[-n:])
+-    except:
+-        return ""
+-
+-@app.route("/command/<cmd>", methods=["POST"])
+-def run_command(cmd):
+-    try:
+-        if cmd == "respawn":
+-            # Just delete the actions file to force a reset if the bot is stuck or Kill the bot?
+-            # Actually, the plugin respawns if _bot is dead.
+-            # We can't easily kill the bot from here without RCON or a flag.
+-            # Let's use a flag file.
+-            with open(os.path.join(PROJECT_ROOT, "shared-data", "command.json"), "w") as f:
+-                json.dump({"action": "respawn"}, f)
+-            return jsonify({"status": "Respawn requested"})
+-        
+-        if cmd == "sync":
+-            os.chdir(PROJECT_ROOT)
+-            subprocess.run(["git", "add", "."], shell=True)
+-            subprocess.run(["git", "commit", "-m", "Remote manual sync"], shell=True)
+-            subprocess.run(["git", "push", "origin", "main"], shell=True)
+-            return jsonify({"status": "Sync initiated"})
+-            
+-        return jsonify({"error": "Unknown command"}), 400
+-    except Exception as e:
+-        return jsonify({"error": str(e)}), 500
+-
+-@app.route("/data")
+-def get_data():
+-    data = {
+-        "vision": {},
+-        "stats": parse_latest_stats(),
+-        "state": {},
+-        "logs": get_last_logs(15)
+-    }
+-    
+-    if os.path.exists(VISION_PATH):
+-        try:
+-            with open(VISION_PATH, "r") as f:
+-                data["vision"] = json.load(f)
+-        except:
+-            pass
+-
+-    if os.path.exists(STATE_PATH):
+-        try:
+-            with open(STATE_PATH, "r") as f:
+-                data["state"] = json.load(f)
+-        except:
+-            pass
+-            
+-    return jsonify(data)
+-
+-@app.route("/")
+-def index():
+-    try:
+-        path = os.path.join(PROJECT_ROOT, "ai-agent", "dashboard.html")
+-        return open(path, encoding='utf-8').read()
+-    except Exception as e:
+-        return f"Dashboard UI Error: {str(e)}", 500
+-
+-if __name__ == "__main__":
+-    app.run(port=8080, debug=False)
+diff --git a/ai-agent/environment.py b/ai-agent/environment.py
+index 59e9eb8..34c6dcd 100644
+--- a/ai-agent/environment.py
++++ b/ai-agent/environment.py
+@@ -26,12 +26,16 @@ class RustEnv(gym.Env):
+         self.wood_count = 0
+         self.cloth_count = 0
+         self.tool_count = 0
++        self.current_tree_name = ""
++        self.current_ore_name = ""
++        self.has_gathered = False
+ 
+         # Ensure shared-data directory exists
+         os.makedirs(os.path.dirname(self.vision_path), exist_ok=True)
+ 
+         # Action space: [Forward/Backward, Left/Right, Jump, Attack/Interact, Sprint]
+-        self.action_space = spaces.Box(low=-1, high=1, shape=(5,), dtype=np.float32)
++        # +1 for Attack/Interact = 7
++        self.action_space = spaces.Box(low=-1, high=1, shape=(7,), dtype=np.float32)
+ 
+         # Observation space:
+         # [PlayerPos(x,y,z), NearestTree(x,y,z), NearestOre(x,y,z), Health]
+@@ -41,16 +45,19 @@ class RustEnv(gym.Env):
+ 
+     def _send_actions(self, action):
+         """Write agent actions to actions.json for the BotController plugin."""
+-        actions_data = {
+-            "Forward": float(action[0]),
+-            "Strafe": float(action[1]),
+-            "Jump": float(action[2]),
+-            "Attack": float(action[3]),
+-            "Sprint": float(action[4])
++        # Map 7 Actions
++        actions = {
++            "MoveX": float(action[0]),
++            "MoveZ": float(action[1]),
++            "LookX": float(action[2]),
++            "LookY": float(action[3]),
++            "Sprint": bool(action[4] > 0),
++            "Jump": bool(action[5] > 0),
++            "Attack": bool(action[6] > 0)
+         }
+         try:
+             with open(self.actions_path, 'w') as f:
+-                json.dump(actions_data, f)
++                json.dump(actions, f)
+         except PermissionError:
+             pass  # Plugin is reading, try next tick
+ 
+@@ -64,14 +71,22 @@ class RustEnv(gym.Env):
+                 data = json.load(f)
+ 
+             player = data.get('PlayerPosition') or {'X': 0, 'Y': 0, 'Z': 0}
+-            tree = data.get('NearestTree') or {'X': 0, 'Y': 0, 'Z': 0}
+-            ore = data.get('NearestOre') or {'X': 0, 'Y': 0, 'Z': 0}
++            
++            tree_data = data.get('NearestTree') or {}
++            tree_pos = tree_data.get('Position', {'X': 0, 'Y': 0, 'Z': 0})
++            self.current_tree_name = tree_data.get('Name', '')
++
++            ore_data = data.get('NearestOre') or {}
++            ore_pos = ore_data.get('Position', {'X': 0, 'Y': 0, 'Z': 0})
++            self.current_ore_name = ore_data.get('Name', '')
++
+             health = data.get('Health', 100.0)
++            self.has_gathered = data.get('HasGathered', False)
+ 
+             obs = np.array([
+                 player['X'], player['Y'], player['Z'],
+-                tree['X'], tree['Y'], tree['Z'],
+-                ore['X'], ore['Y'], ore['Z'],
++                tree_pos['X'], tree_pos['Y'], tree_pos['Z'],
++                ore_pos['X'], ore_pos['Y'], ore_pos['Z'],
+                 health / 100.0  # Normalize health to 0-1
+             ], dtype=np.float32)
+             return obs
+@@ -88,7 +103,7 @@ class RustEnv(gym.Env):
+         self.tool_count = 0
+ 
+         # Send a "stop" action to reset the bot's momentum
+-        self._send_actions(np.zeros(5, dtype=np.float32))
++        self._send_actions(np.zeros(7, dtype=np.float32))
+         time.sleep(0.15)  # Wait for server tick
+ 
+         observation = self._get_obs()
+@@ -108,19 +123,14 @@ class RustEnv(gym.Env):
+         observation = self._get_obs()
+ 
+         # Extract info from vision.json for rewards and achievements
+-        has_gathered = False
+-        try:
+-            if os.path.exists(self.vision_path):
+-                with open(self.vision_path, 'r') as f:
+-                    data = json.load(f)
+-                    has_gathered = data.get('HasGathered', False)
+-        except:
+-            pass
++        has_gathered = self.has_gathered
++        is_harvesting = action[6] > 0
+ 
+         # Calculate reward
+         tree_dist = np.linalg.norm(observation[3:6])
+         ore_dist = np.linalg.norm(observation[6:9])
+         min_dist = min(tree_dist, ore_dist)
++        interaction_range = 3.0
+ 
+         reward = 0.0
+ 
+@@ -128,17 +138,35 @@ class RustEnv(gym.Env):
+         if self.prev_tree_dist is not None:
+             prev_min = min(self.prev_tree_dist, self.prev_ore_dist)
+             if min_dist < prev_min:
+-                reward += 10.0  # Constant +10 for decreasing distance
++                reward += 10.0  # Movement reward
+             elif min_dist > prev_min:
+-                reward -= 1.0   # Reduced penalty for moving away while sprinting
+-        
++                reward -= 1.0   # Penalty for moving away
++
+         # Reward for being very close (encourages parking/staying)
+-        if min_dist < 3.0:
++        if min_dist < interaction_range:
+             reward += 0.5
++            
++        object_type = ""
++        if min_dist == tree_dist:
++            if 'hemp' in self.current_tree_name.lower():
++                object_type = "Hemp"
++            else:
++                object_type = "Wood"
++        elif min_dist == ore_dist:
++            object_type = "Ore"
+ 
+-        # Major bonus for successful "Hit" (+100 as requested)
+-        if has_gathered:
++        # Major bonus for successful "Hit" (+100, which is 10x movement +10)
++        # We only reward if they actually executed the harvesting action and it landed.
++        if is_harvesting and has_gathered and min_dist < interaction_range:
+             reward += 100.0
++            
++            # Since the object might disappear from the json stream, this incentivizes hitting until gone
++            if object_type == "Wood":
++                self.wood_count += 1
++            elif object_type == "Ore":
++                self.tool_count += 1  # Using tool_count to track Ore
++            elif object_type == "Hemp":
++                self.cloth_count += 1
+ 
+         # Small step penalty to encourage efficiency
+         reward -= 0.1
+@@ -151,20 +179,7 @@ class RustEnv(gym.Env):
+         truncated = self.steps >= self.max_steps
+         terminated = False
+ 
+-        # Achievements Tracking
+-        if has_gathered:
+-            if tree_dist < 3.0:
+-                self.wood_count += 1
+-            elif ore_dist < 3.0:
+-                # For now, let's say ore gathering counts as progress towards 'First Tool' 
+-                # or just track it separately. The user asked for 'First Tool'.
+-                # In Rust, you usually craft tools. We'll mock 'First Tool' as 
+-                # gathering 5 ore for now, or just leave it at 0 if not Implementable.
+-                # Let's just track wood and cloth for now as per heuristics.
+-                pass 
+-            else:
+-                # If gathered but not near tree/ore, it's likely hemp/cloth
+-                self.cloth_count += 1
++        # Disabling old simple string-based achievements loop since it's already updated inside harvest logic.
+         
+         # Determine Current Goal
+         health = observation[9] * 100.0
+@@ -188,6 +203,7 @@ class RustEnv(gym.Env):
+             "reward": reward,
+             "wood_count": self.wood_count,
+             "cloth_count": self.cloth_count,
++            "is_harvesting": 1 if is_harvesting else 0,
+             # Achievement logging (boolean flags for WandB)
+             "achievement/10x_cloth": 1 if self.cloth_count >= 10 else 0,
+             "achievement/first_wood": 1 if self.wood_count >= 1 else 0,
+@@ -201,7 +217,7 @@ class RustEnv(gym.Env):
+ 
+     def close(self):
+         # Send stop action on close
+-        self._send_actions(np.zeros(4, dtype=np.float32))
++        self._send_actions(np.zeros(7, dtype=np.float32))
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/ai-agent/migrate_model.py b/ai-agent/migrate_model.py
+new file mode 100644
+index 0000000..14b4846
+--- /dev/null
++++ b/ai-agent/migrate_model.py
+@@ -0,0 +1,68 @@
++import torch
++from stable_baselines3 import PPO
++from environment import RustEnv
++from stable_baselines3.common.monitor import Monitor
++from gymnasium import spaces
++import numpy as np
++import os
++
++def migrate_model():
++    old_path = "models/old_model_5_actions.zip"
++    new_path = "models/latest_model.zip"
++    
++    if not os.path.exists(old_path):
++        print("Old model not found.")
++        return
++
++    print("--- Performing Neural Surgery ---")
++    
++    env_5.action_space = spaces.Box(low=-1, high=1, shape=(5,), dtype=np.float32)
++    env_5 = Monitor(env_5)
++    
++    old_model = PPO.load(old_path, env=env_5)
++    old_params = old_model.policy.state_dict()
++    
++    # 2. Create the new env with 6 actions
++    env_6 = RustEnv() # Default now 6
++    env_6 = Monitor(env_6)
++    
++    new_model = PPO("MlpPolicy", env_6, verbose=1)
++    new_params = new_model.policy.state_dict()
++    
++    # 3. Migrate weights
++    # Most weights (layers) will match exactly. 
++    # Only the final output layer (action_net) will differ.
++    
++    for key in new_params:
++        if key in old_params:
++            if new_params[key].shape == old_params[key].shape:
++                new_params[key] = old_params[key]
++                print(f"Migrated layer: {key}")
++            else:
++                # This is the action_net. We copy the first 4 actions and init the 5th (Sprint).
++                if "action_net" in key:
++                    print(f"Splicing layer: {key}")
++                    old_layer = old_params[key]
++                    new_layer = new_params[key]
++                    # Shape is typically [out_features, in_features]
++                    # For a 4->5 action space, out_features changes.
++                    # In PPO, action_net is the mean. log_std is separate.
++                    if len(old_layer.shape) == 2: # Weight
++                        new_layer[:old_layer.shape[0], :] = old_layer
++                    else: # Bias
++                        new_layer[:old_layer.shape[0]] = old_layer
++                elif "log_std" in key:
++                    print(f"Splicing log_std: {key}")
++                    old_std = old_params[key]
++                    new_std = new_params[key]
++                    new_std[:old_std.shape[0]] = old_std
++
++    # 4. Load the spliced weights
++    new_model.policy.load_state_dict(new_params)
++    
++    # 5. Save as latest_model
++    new_model.save(new_path)
++    print("--- Surgery Complete. Model migrated to 5-action space. ---")
++
++if __name__ == "__main__":
++    migrate_model()
+diff --git a/ai-agent/train.py b/ai-agent/train.py
+index f7c40f7..66d5e3a 100644
+--- a/ai-agent/train.py
++++ b/ai-agent/train.py
+@@ -1,80 +1,310 @@
+ import gymnasium as gym
+ import time
++import os
++import io
++import json
++import numpy as np
++import threading
++import torch
++import torch_directml
++import traceback
++import matplotlib
++matplotlib.use('Agg')
++import matplotlib.pyplot as plt
+ from stable_baselines3 import PPO
+-from stable_baselines3.common.callbacks import CheckpointCallback
+-from wandb.integration.sb3 import WandbCallback
++from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
++from stable_baselines3.common.monitor import Monitor
+ import wandb
+ from environment import RustEnv
+-import os
+-import torch
+ 
+-from stable_baselines3.common.monitor import Monitor
++VISION_PATH = "shared-data/vision.json"
++ACTIONS_PATH = "shared-data/actions.json"
++
++def safe_load_json(path):
++    try:
++        if os.path.exists(path):
++            with open(path, 'r') as f:
++                return json.load(f)
++    except:
++        pass
++    return {}
++
++def background_dashboard_thread():
++    """Generates the 2D matplotlib map and logs it to W&B every 2 seconds without blocking training."""
++    while True:
++        time.sleep(2)
++        try:
++            vision_data = safe_load_json(VISION_PATH)
++            action_data = safe_load_json(ACTIONS_PATH)
++            if not vision_data or not action_data:
++                continue
++                
++            px = vision_data.get("PlayerPosition", {}).get("X", 0)
++            pz = vision_data.get("PlayerPosition", {}).get("Z", 0)
++            
++            tx = vision_data.get("NearestTree", {}).get("Position", {}).get("X", 0)
++            tz = vision_data.get("NearestTree", {}).get("Position", {}).get("Z", 0)
++            
++            ox = vision_data.get("NearestOre", {}).get("Position", {}).get("X", 0)
++            oz = vision_data.get("NearestOre", {}).get("Position", {}).get("Z", 0)
++            
++            is_harvesting = action_data.get("Attack", False)
++            
++            fig, ax = plt.subplots(figsize=(6, 6))
++            fig.patch.set_facecolor('#0e1117')
++            ax.set_facecolor('#0e1117')
++            
++            dist_tree = np.linalg.norm([px - tx, pz - tz])
++            dist_ore = np.linalg.norm([px - ox, pz - oz])
++            nearest_x, nearest_z = (tx, tz) if dist_tree < dist_ore else (ox, oz)
++            
++            tree_color = 'yellow' if (is_harvesting and dist_tree < dist_ore) else 'green'
++            ore_color = 'yellow' if (is_harvesting and dist_tree >= dist_ore) else 'saddlebrown'
++            
++            if is_harvesting:
++                if dist_tree < dist_ore:
++                    ax.scatter(tx, tz, color=tree_color, s=500, alpha=0.5)
++                else:
++                    ax.scatter(ox, oz, color=ore_color, s=500, alpha=0.5)
++                    
++            ax.scatter(px, pz, color='dodgerblue', s=200, label='Agent')
++            ax.scatter(tx, tz, color=tree_color, s=150, marker='^', label='Tree/Hemp')
++            ax.scatter(ox, oz, color=ore_color, s=150, marker='s', label='Ore')
++            ax.plot([px, nearest_x], [pz, nearest_z], color='lime' if is_harvesting else 'white', linestyle='--', alpha=0.5)
++            
++            all_x = [px, tx, ox]
++            all_z = [pz, tz, oz]
++            ax.set_xlim(min(all_x) - 5.0, max(all_x) + 5.0)
++            ax.set_ylim(min(all_z) - 5.0, max(all_z) + 5.0)
++            
++            ax.legend(facecolor='#1e1e1e', edgecolor='none', labelcolor='white', loc='upper left')
++            ax.grid(color='gray', linestyle=':', alpha=0.2)
++            ax.set_title("Raycast & Harvest Targeting (W&B Live)", color='white')
++            
++            buf = io.BytesIO()
++            plt.savefig(buf, format='png', bbox_inches='tight')
++            plt.close(fig)
++            buf.seek(0)
++            img = wandb.Image(buf)
++            
++            wandb.log({"live_map": img}, commit=False)
++        except Exception as e:
++            pass
++
++def progress_pulse_thread(model_ref, env_ref):
++    """Logs progress every 30 seconds and stops everything if stalled for 2 minutes."""
++    last_step = -1
++    last_time = time.time()
++    stall_timer = 0
++    
++    while True:
++        time.sleep(30)
++        try:
++            model = model_ref[0] # Using array ref to get latest model
++            if model is None:
++                continue
++            
++            current_step = model.num_timesteps
++            
++            # Step Throughput (SPS) Tracking
++            current_time = time.time()
++            elapsed_time = current_time - last_time
++            sps = (current_step - last_step) / elapsed_time if last_step >= 0 and elapsed_time > 0 else 0.0
++            last_time = current_time
++            
++            wandb.log({"pulse/sps": sps}, commit=False)
++            
++            # Relying on native W&B API telemetry for AMD GPU Load instead
++            gpu_load = "W&B (AMD)"
++                
++            # Get latest reward from the SB3 logger if possible
++            last_reward = 0.0
++            if model.logger and model.logger.name_to_value:
++                last_reward = model.logger.name_to_value.get("rollout/ep_rew_mean", 0.0)
++                
++            print(f"Status: Training Active. Step: {current_step}. Last Reward: {last_reward:.1f}. GPU Load: {gpu_load}", flush=True)
++            
++            if current_step == last_step:
++                stall_timer += 30
++                if stall_timer >= 120:
++                    print(f"ERROR: Step count has not moved from {current_step} for 2 minutes. Stalled. Stopping everything.", flush=True)
++                    os._exit(1)
++            else:
++                last_step = current_step
++                stall_timer = 0
++        except Exception as e:
++            pass
++
++class SimpleLogCallback(CheckpointCallback):
++    def __init__(self, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        self.harvest_history = []
++
++    def _on_step(self) -> bool:
++        infos = self.locals["infos"][0]
++        cloth_count = infos.get("cloth_count", 0)
++        wood_count = infos.get("wood_count", 0)
++        reward = infos.get("reward", 0.0)
++        is_harvesting = infos.get("is_harvesting", 0)
++        
++        self.harvest_history.append(is_harvesting)
++        if len(self.harvest_history) > 100:
++            self.harvest_history.pop(0)
++        
++        if not hasattr(self, "milestone_achieved") and cloth_count >= 1:
++            print("\n*** MILESTONE ACHIEVED: 1x Cloth Collected! ***\n", flush=True)
++            self.milestone_achieved = True
++            
++        if self.n_calls == 1000 and hasattr(self, "model") and hasattr(self.model.policy, "optimizer"):
++            for param_group in self.model.policy.optimizer.param_groups:
++                if param_group['lr'] == 1e-5:
++                    param_group['lr'] = 3e-4
++                    print(f"\n*** SAFETY BUFFER COMPLETE: Restored learning rate to 3e-4 at total step {self.num_timesteps} ***\n", flush=True)
++            
++        if self.n_calls % 100 == 0:
++            harvest_rate = sum(self.harvest_history) / len(self.harvest_history) if self.harvest_history else 0.0
++            wandb.log({
++                "inventory/wood": wood_count,
++                "inventory/cloth": cloth_count,
++                "reward_step": reward,
++                "action_metrics/harvest_rate": harvest_rate * 100.0
++            }, step=self.num_timesteps)
++        return super()._on_step()
+ 
+ def train():
+-    # Paths
+-    vision_path = "shared-data/vision.json"
+     models_dir = "models"
+-    checkpoints_dir = os.path.join(models_dir, "checkpoints")
+-    
+-    # Ensure directories exist
++    checkpoints_dir = os.path.join(models_dir, "v2_checkpoints")
+     os.makedirs(models_dir, exist_ok=True)
+     os.makedirs(checkpoints_dir, exist_ok=True)
+-    os.makedirs(os.path.dirname(vision_path), exist_ok=True)
++    os.makedirs(os.path.dirname(VISION_PATH), exist_ok=True)
+     
+-    # Create the environment and wrap with Monitor
+-    env = RustEnv(vision_path=vision_path)
+-    env = Monitor(env)
++    run = wandb.init(
++        project="rust-rl-v2-modular",
++        mode="online", # Synced to W&B cloud dashboard
++        sync_tensorboard=True,
++        monitor_gym=True,
++        save_code=True,
++        resume="allow",
++        id="deft-disco-1",
++    )
+     
+-    # Initialize WandB - DISABLED for stability
+-    # run = wandb.init(
+-    #     project="rust-rl-agent",
+-    #     mode="offline",
+-    #     sync_tensorboard=True,
+-    #     monitor_gym=True,
+-    #     save_code=True,
+-    # )
+-
+-    # Resume Logic (Check for latest_model.zip)
+-    latest_model_path = os.path.join(models_dir, "latest_model.zip")
+-    if os.path.exists(latest_model_path):
+-        print(f"Resuming training from {latest_model_path}")
+-        model = PPO.load(latest_model_path, env=env, device="auto")
+-    else:
+-        print("Starting new training session")
+-        model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="runs/v1_2", device="auto")
++    env = Monitor(RustEnv(vision_path=VISION_PATH))
+     
+-    class SimpleLogCallback(CheckpointCallback):
+-        def _on_step(self) -> bool:
+-            if self.n_calls % 100 == 0:
+-                infos = self.locals["infos"][0]
+-                goal = infos.get("current_goal", "Thinking...")
+-                reward = infos.get("reward", 0.0)
+-                steps = self.num_timesteps
+-                print(f"[{time.ctime()}] Groundbreaker: {goal} | Reward: {reward:.1f} | Total Steps: {steps}", flush=True)
+-            return super()._on_step()
+-
+-    simple_callback = SimpleLogCallback(
+-        save_freq=5000,
+-        save_path=checkpoints_dir,
+-        name_prefix="rust_rl_model",
++    # Independent Evaluation Validation Tracker
++    eval_env = Monitor(RustEnv(vision_path=VISION_PATH))
++    eval_callback = EvalCallback(
++        eval_env,
++        best_model_save_path=os.path.join(checkpoints_dir, "best_model"),
++        log_path=checkpoints_dir,
++        eval_freq=10000,
++        n_eval_episodes=10,
++        deterministic=True,
++        render=False
+     )
+-
+-    print("Starting training... (Wait for plugin to generate data)")
+     
+-    # Train the agent
+-    try:
+-        model.learn(
+-            total_timesteps=1000000, 
+-            callback=[simple_callback],
+-            progress_bar=False
+-        )
+-    except KeyboardInterrupt:
+-        print("Training interrupted by user.")
+-    finally:
+-        # Save the final model as 'latest_model' for future resumes
+-        model.save(latest_model_path)
+-        print(f"Model saved to {latest_model_path}")
+-        wandb.finish()
++    latest_model_path = os.path.join(checkpoints_dir, "latest_model.zip")
++    
++    batch_size = 64 # Default
++    model_ref = [None] # Array ref so pulse thread can see the model
++    
++    # Start background W&B visualizer
++    t_dash = threading.Thread(target=background_dashboard_thread, daemon=True)
++    t_dash.start()
++    
++    # Start pulse logger
++    t_pulse = threading.Thread(target=progress_pulse_thread, args=(model_ref, env), daemon=True)
++    t_pulse.start()
++    
++    while True: # Loop for OOM Auto-Restart
++        try:
++            pre_restart_path = os.path.join(checkpoints_dir, "pre_restart_v2.zip")
++            if os.path.exists(pre_restart_path):
++                print(f"Found pre_restart_v2.zip. Renaming to latest_model.zip to consume for resume...")
++                if os.path.exists(latest_model_path):
++                    os.remove(latest_model_path)
++                os.rename(pre_restart_path, latest_model_path)
++                
++            if os.path.exists(latest_model_path):
++                print(f"Resuming training from {latest_model_path} with batch_size={batch_size}")
++                model = PPO.load(latest_model_path, env=env, device="cpu")
++                model.device = torch_directml.device()
++                model.policy = model.policy.to(model.device)
++                
++                # Move optimizer states to DirectML
++                if hasattr(model.policy, "optimizer"):
++                    for state in model.policy.optimizer.state.values():
++                        for k, v in state.items():
++                            if isinstance(v, torch.Tensor):
++                                state[k] = v.to(model.device)
++                                
++                # Safety Buffer: lower learning rate for the first 1000 steps of this session
++                if hasattr(model.policy, "optimizer"):
++                    for param_group in model.policy.optimizer.param_groups:
++                        param_group['lr'] = 1e-5
++                    print("Safety Buffer: Learning rate lowered to 1e-5 for the first 1000 steps.", flush=True)
++                                
++                # Ensure batch size is applied if reduced
++                model.batch_size = batch_size 
++            else:
++                print(f"Starting new training session with batch_size={batch_size}")
++                model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="runs/v2_modular", device="cpu", batch_size=batch_size)
++                model.device = torch_directml.device()
++                model.policy = model.policy.to(model.device)
++                
++                # Move optimizer states to DirectML
++                if hasattr(model.policy, "optimizer"):
++                    for state in model.policy.optimizer.state.values():
++                        for k, v in state.items():
++                            if isinstance(v, torch.Tensor):
++                                state[k] = v.to(model.device)
++            
++            model_ref[0] = model
++            
++            simple_callback = SimpleLogCallback(
++                save_freq=5000,
++                save_path=checkpoints_dir,
++                name_prefix="rust_rl_model",
++            )
++
++            print("Starting training... (Wait for plugin to generate data)", flush=True)
++            model.learn(
++                total_timesteps=1000000, 
++                callback=[simple_callback, eval_callback],
++                progress_bar=False,
++                reset_num_timesteps=False
++            )
++            break # If learn completes without exception, break loop
++            
++        except torch.cuda.OutOfMemoryError:
++            print(f"CUDA_OUT_OF_MEMORY! Attempting to drop batch_size from {batch_size} and restart.", flush=True)
++            batch_size = max(4, batch_size // 2)
++            torch.cuda.empty_cache()
++            time.sleep(2)
++            continue # Restart loop
++        except RuntimeError as e:
++            if "CUDA out of memory" in str(e):
++                print(f"CUDA_OUT_OF_MEMORY (RuntimeError)! Dropping batch_size from {batch_size} and restarting.", flush=True)
++                batch_size = max(4, batch_size // 2)
++                torch.cuda.empty_cache()
++                time.sleep(2)
++                continue
++            else:
++                print(f"Runtime Exception: {e}", flush=True)
++                break
++        except KeyboardInterrupt:
++            print("Training interrupted by user.", flush=True)
++            break
++        except Exception as e:
++            print(f"Unexpected Exception: {e}", flush=True)
++            traceback.print_exc()
++            break
++            
++    # Save the final model as 'latest_model' for future resumes
++    if model_ref[0]:
++        model_ref[0].save(latest_model_path)
++        print(f"Model saved to {latest_model_path}", flush=True)
++        
++    wandb.finish()
+ 
+ if __name__ == "__main__":
+     train()
+diff --git a/project_state.json b/project_state.json
+index 6ed6a03..0622c4c 100644
+--- a/project_state.json
++++ b/project_state.json
+@@ -1,12 +1,5 @@
+ {
+-  "current_task": "System Recovery & Groundbreaker Launch",
+-  "status": "Completed - Monitoring",
+-  "last_update": "2026-03-18T10:28:00-07:00",
+-  "system_checkpoint": {
+-    "step": "Post-Launch Explanation",
+-    "last_successful_operation": "Training Resume",
+-    "blocker": "None",
+-    "attempt_count": 1
+-  },
+-  "notes": "System is healthy and training. Responding to user questions about monitoring and retention."
+-}
++  "last_successful_step_count": 0,
++  "status": "Resuming V2 Modular",
++  "notes": "Loaded pre_restart_v2.zip, joined deft-disco-1 W&B run."
++}
+\ No newline at end of file
+diff --git a/shared-data/actions.json b/shared-data/actions.json
+index 24c520b..b14cd79 100644
+--- a/shared-data/actions.json
++++ b/shared-data/actions.json
+@@ -1 +1 @@
+-{"Forward": 1.0, "Strafe": -0.3980288803577423, "Jump": 0.5475989580154419, "Attack": -0.920195460319519, "Sprint": 0.5258657336235046}
+\ No newline at end of file
++{"MoveX": -0.8641502261161804, "MoveZ": -1.0, "LookX": -1.0, "LookY": 0.02447107806801796, "Sprint": true, "Jump": false, "Attack": true}
+\ No newline at end of file
+diff --git a/train_v1_2.log b/train_v1_2.log
+index 9c315af..7d1eebb 100644
+--- a/train_v1_2.log
++++ b/train_v1_2.log
+@@ -924,3 +924,46 @@ Logging to runs/v1_2\PPO_4
+ |    std                  | 0.943         |
+ |    value_loss           | 2.25e+04      |
+ -------------------------------------------
++[Wed Mar 18 17:21:31 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 45100
++[Wed Mar 18 17:21:41 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 45200
++[Wed Mar 18 17:21:51 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 45300
++[Wed Mar 18 17:22:02 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 45400
++[Wed Mar 18 17:22:12 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 45500
++[Wed Mar 18 17:22:22 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 45600
++[Wed Mar 18 17:22:32 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 45700
++[Wed Mar 18 17:22:43 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 45800
++[Wed Mar 18 17:22:53 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 45900
++[Wed Mar 18 17:23:03 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 46000
++[Wed Mar 18 17:23:13 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 46100
++[Wed Mar 18 17:23:24 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 46200
++[Wed Mar 18 17:23:34 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 46300
++[Wed Mar 18 17:23:44 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 46400
++[Wed Mar 18 17:23:54 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 46500
++[Wed Mar 18 17:24:05 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 46600
++[Wed Mar 18 17:24:15 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 46700
++[Wed Mar 18 17:24:25 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 46800
++[Wed Mar 18 17:24:36 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 46900
++[Wed Mar 18 17:24:46 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 47000
++[Wed Mar 18 17:24:56 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Total Steps: 47100
++-------------------------------------------
++| rollout/                |               |
++|    ep_len_mean          | 2.05e+03      |
++|    ep_rew_mean          | 3.07e+03      |
++| time/                   |               |
++|    fps                  | 9             |
++|    iterations           | 23            |
++|    time_elapsed         | 4845          |
++|    total_timesteps      | 47104         |
++| train/                  |               |
++|    approx_kl            | 2.0352309e-06 |
++|    clip_fraction        | 0             |
++|    clip_range           | 0.2           |
++|    entropy_loss         | -6.8          |
++|    explained_variance   | 0             |
++|    learning_rate        | 0.0003        |
++|    loss                 | 1.28e+04      |
++|    n_updates            | 220           |
++|    policy_gradient_loss | -6.62e-05     |
++|    std                  | 0.943         |
++|    value_loss           | 1.89e+04      |
++-------------------------------------------
+diff --git a/train_v1_3.log b/train_v1_3.log
+new file mode 100644
+index 0000000..63ebaf9
+--- /dev/null
++++ b/train_v1_3.log
+@@ -0,0 +1,38 @@
++Resuming training from models\latest_model.zip
++Wrapping the env in a DummyVecEnv.
++Starting training... (Wait for plugin to generate data)
++[Wed Mar 18 17:41:29 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 100 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:41:39 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 200 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:41:50 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 300 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:42:00 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 400 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:42:10 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 500 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:42:20 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 600 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:42:31 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 700 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:42:41 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 800 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:42:51 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 900 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:43:01 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 1000 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:43:12 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 1100 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:43:22 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 1200 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:43:32 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 1300 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:43:42 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 1400 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:43:53 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 1500 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:44:03 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 1600 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:44:13 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 1700 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:44:24 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 1800 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:44:34 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 1900 | KL: 0.00000 | Ent: 0.00
++[Wed Mar 18 17:44:44 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 2000 | KL: 0.00000 | Ent: 0.00
++---------------------------------
++| rollout/           |          |
++|    ep_len_mean     | 2.05e+03 |
++|    ep_rew_mean     | 819      |
++| time/              |          |
++|    fps             | 9        |
++|    iterations      | 1        |
++|    time_elapsed    | 210      |
++|    total_timesteps | 2048     |
++---------------------------------
++[Wed Mar 18 17:44:56 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 2100 | KL: 0.01307 | Ent: -7.15
++[Wed Mar 18 17:45:06 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 2200 | KL: 0.01307 | Ent: -7.15
++[Wed Mar 18 17:45:16 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 2300 | KL: 0.01307 | Ent: -7.15
++[Wed Mar 18 17:45:27 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 2400 | KL: 0.01307 | Ent: -7.15
++[Wed Mar 18 17:45:37 2026] Groundbreaker: Low Health - Recovering | Reward: 0.4 | Steps: 2500 | KL: 0.01307 | Ent: -7.15
+diff --git a/train_v1_4.log b/train_v1_4.log
+new file mode 100644
+index 0000000..1fc2098
+--- /dev/null
++++ b/train_v1_4.log
+@@ -0,0 +1,54 @@
++Resuming training from models\latest_model.zip
++Wrapping the env in a DummyVecEnv.
++Starting training... (Wait for plugin to generate data)
++Model saved to models\latest_model.zip
++Traceback (most recent call last):
++  File "C:\Projects\rust-rl-agent\ai-agent\train.py", line 90, in <module>
++    train()
++    ~~~~~^^
++  File "C:\Projects\rust-rl-agent\ai-agent\train.py", line 75, in train
++    model.learn(
++    ~~~~~~~~~~~^
++        total_timesteps=1000000,
++        ^^^^^^^^^^^^^^^^^^^^^^^^
++    ...<2 lines>...
++        reset_num_timesteps=False
++        ^^^^^^^^^^^^^^^^^^^^^^^^^
++    )
++    ^
++  File "C:\Projects\rust-rl-agent\venv\Lib\site-packages\stable_baselines3\ppo\ppo.py", line 311, in learn
++    return super().learn(
++           ~~~~~~~~~~~~~^
++        total_timesteps=total_timesteps,
++        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++    ...<4 lines>...
++        progress_bar=progress_bar,
++        ^^^^^^^^^^^^^^^^^^^^^^^^^^
++    )
++    ^
++  File "C:\Projects\rust-rl-agent\venv\Lib\site-packages\stable_baselines3\common\on_policy_algorithm.py", line 311, in learn
++    total_timesteps, callback = self._setup_learn(
++                                ~~~~~~~~~~~~~~~~~^
++        total_timesteps,
++        ^^^^^^^^^^^^^^^^
++    ...<3 lines>...
++        progress_bar,
++        ^^^^^^^^^^^^^
++    )
++    ^
++  File "C:\Projects\rust-rl-agent\venv\Lib\site-packages\stable_baselines3\common\base_class.py", line 423, in _setup_learn
++    self._last_obs = self.env.reset()  # type: ignore[assignment]
++                     ~~~~~~~~~~~~~~^^
++  File "C:\Projects\rust-rl-agent\venv\Lib\site-packages\stable_baselines3\common\vec_env\dummy_vec_env.py", line 78, in reset
++    obs, self.reset_infos[env_idx] = self.envs[env_idx].reset(seed=self._seeds[env_idx], **maybe_options)
++                                     ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "C:\Projects\rust-rl-agent\venv\Lib\site-packages\stable_baselines3\common\monitor.py", line 83, in reset
++    return self.env.reset(**kwargs)
++           ~~~~~~~~~~~~~~^^^^^^^^^^
++  File "C:\Projects\rust-rl-agent\ai-agent\environment.py", line 93, in reset
++    self._send_actions(np.zeros(5, dtype=np.float32))
++    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++  File "C:\Projects\rust-rl-agent\ai-agent\environment.py", line 51, in _send_actions
++    "Jump": action[5] > 0
++            ~~~~~~^^^
++IndexError: index 5 is out of bounds for axis 0 with size 5

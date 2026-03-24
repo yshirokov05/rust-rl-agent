@@ -1,6 +1,0 @@
-C:\Projects\rust-rl-agent\venv\Lib\site-packages\torch\cuda\__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
-  import pynvml  # type: ignore[import]
-Checking for Rust game server/plugin on 127.0.0.1:28082 (TCP)...
-SUCCESS: Rust server is ONLINE on port 28082. Proceeding to train.
-wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from C:\Users\Yuri\_netrc.
-wandb: Currently logged in as: yshirokov05 (yshirokov05-personal) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin

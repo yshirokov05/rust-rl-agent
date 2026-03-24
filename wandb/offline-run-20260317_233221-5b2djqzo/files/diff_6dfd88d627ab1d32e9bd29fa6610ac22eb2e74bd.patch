@@ -1,0 +1,14 @@
+warning: in the working copy of 'start_server.bat', LF will be replaced by CRLF the next time Git touches it
+diff --git a/start_server.bat b/start_server.bat
+index f7e8a83..a289a0d 100644
+--- a/start_server.bat
++++ b/start_server.bat
+@@ -5,7 +5,7 @@ setlocal
+ set SERVER_ROOT=C:\Projects\rust-rl-agent\server\steamapps\common\rust_dedicated
+ set IDENTITY=rust_server
+ set SEED=12345
+-set WORLDSIZE=3000
++set WORLDSIZE=1500
+ set PORT=28015
+ set RCON_PORT=28016
+ set RCON_PASSWORD=antigravity

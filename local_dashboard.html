@@ -2,73 +2,189 @@
             <!DOCTYPE html>
             <html>
             <head>
-                <meta http-equiv="refresh" content="1">
-                <title>Rust RL Local Dashboard</title>
+                <meta http-equiv="refresh" content="2">
+                <title>Rust RL CC - v2.0</title>
                 <style>
-                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0e1117; color: white; padding: 20px; }
-                    .card { background: #1e2128; border-radius: 10px; padding: 20px; margin-bottom: 20px; border-left: 5px solid #4CAF50; }
-                    .metric { font-size: 24px; font-weight: bold; color: #4CAF50; }
-                    .label { font-size: 14px; color: #888; }
-                    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
-                    .raw { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; overflow: auto; max-height: 200px; }
+                    :root { --bg: #0e1117; --card: #161b22; --accent: #4CAF50; }
+                    body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: #c9d1d9; margin: 0; padding: 20px; }
+                    .container { max-width: 1200px; margin: 0 auto; }
+                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #30363d; padding-bottom: 20px; }
+                    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 20px 0; }
+                    .stat-box { background: var(--card); border: 1px solid #30363d; border-radius: 6px; padding: 20px; text-align: center; }
+                    .stat-val { font-size: 32px; font-weight: bold; color: var(--accent); }
+                    .main-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+                    .radar-box { background: var(--card); border: 1px solid #30363d; border-radius: 6px; padding: 20px; position: relative; }
+                    .radar-svg { width: 100%; height: 500px; background: #000; border-radius: 4px; }
+                    .agent-list { display: flex; flex-direction: column; gap: 10px; }
+                    .agent-card { background: var(--card); border: 1px solid #30363d; border-radius: 6px; padding: 12px; }
+                    .bot-name { font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #30363d; padding-bottom: 4px; }
+                    .stat-row { display: flex; justify-content: space-between; font-size: 13px; margin: 4px 0; }
+                    .progress-bar { background: #30363d; height: 4px; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+                    .fill { height: 100%; background: var(--accent); }
+                    .radar-label { position: absolute; font-size: 10px; color: #888; }
                 </style>
             </head>
             <body>
-                <h1>Rust RL Real-Time Monitor</h1>
-                <p>Last Update: 09:44:43</p>
+                <div class="container">
+                    <div class="header">
+                        <div>
+                            <h1 style="margin:0;">🤖 Command Center</h1>
+                            <p style="color:#888; font-size: 14px;">Multi-Bot RL Training Active (v2.1)</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 18px; color: var(--accent);">14:22:08</div>
+                            <div style="font-size: 12px; color: #888;">Live Telemetry Pulse</div>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div style="color:#888;">Total Steps</div>
+                            <div class="stat-val">0</div>
+                        </div>
+                        <div class="stat-box">
+                            <div style="color:#888;">Learning Speed</div>
+                            <div class="stat-val">0.0 <span style="font-size:14px;">SPS</span></div>
+                        </div>
+                        <div class="stat-box">
+                            <div style="color:#888;">GPU Load</div>
+                            <div class="stat-val">ACTIVE <span style="font-size:14px;">DirectML</span></div>
+                        </div>
+                    </div>
+
+                    <div class="main-grid">
+                        <div class="radar-box">
+                            <h3 style="margin-top:0;">📡 Agent Radar (Top-Down)</h3>
+                            <svg class="radar-svg" viewBox="0 0 500 500">
+                                <!-- Grid Lines -->
+                                <circle cx="250" cy="250" r="100" stroke="#222" fill="none" />
+                                <circle cx="250" cy="250" r="200" stroke="#222" fill="none" />
+                                <line x1="0" y1="250" x2="500" y2="250" stroke="#222" />
+                                <line x1="250" y1="0" x2="250" y2="500" stroke="#333" />
+                                <circle cx="250" cy="250" r="5" fill="white" opacity="0.8" /><circle cx="250" cy="250" r="5" fill="white" opacity="0.8" /><circle cx="250" cy="250" r="5" fill="white" opacity="0.8" /><circle cx="250" cy="250" r="5" fill="white" opacity="0.8" /><circle cx="250" cy="250" r="5" fill="white" opacity="0.8" /><circle cx="250" cy="250" r="5" fill="white" opacity="0.8" /><circle cx="250" cy="250" r="5" fill="white" opacity="0.8" /><circle cx="250" cy="250" r="5" fill="white" opacity="0.8" />
+                                <text x="255" y="245" fill="#888" font-size="10">AGENT CENTER</text>
+                            </svg>
+                            <div style="margin-top: 10px; font-size: 12px; display: flex; gap: 20px;">
+                                <span><span style="color:white;">●</span> Bot</span>
+                                <span><span style="color:green;">●</span> Tree</span>
+                                <span><span style="color:red;">●</span> Ore</span>
+                            </div>
+                        </div>
+                        <div class="agent-list">
+                            <h3 style="margin-top:0;">👥 Agent Status</h3>
+                            
+                <div class="agent-card">
+                    <div class="bot-name">Agent 0</div>
+                    <div class="stat-row">
+                        <span>Health:</span>
+                        <span class="value">100%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Goal:</span>
+                        <span class="value" style="color: #4CAF50;">Harvesting</span>
+                    </div>
+                    <div class="progress-bar"><div class="fill" style="width: 100%"></div></div>
+                </div>
                 
-                <div class="grid">
-                    <div class="card">
-                        <div class="label">Health</div>
-                        <div class="metric">100.0%</div>
+                <div class="agent-card">
+                    <div class="bot-name">Agent 1</div>
+                    <div class="stat-row">
+                        <span>Health:</span>
+                        <span class="value">100%</span>
                     </div>
-                    <div class="card" style="border-left-color: #2196F3;">
-                        <div class="label">Position</div>
-                        <div class="metric">X: -353.3 Z: -142.9</div>
+                    <div class="stat-row">
+                        <span>Goal:</span>
+                        <span class="value" style="color: #4CAF50;">Harvesting</span>
                     </div>
-                    <div class="card" style="border-left-color: #FFEB3B;">
-                        <div class="label">Harvesting</div>
-                        <div class="metric">NO</div>
+                    <div class="progress-bar"><div class="fill" style="width: 100%"></div></div>
+                </div>
+                
+                <div class="agent-card">
+                    <div class="bot-name">Agent 2</div>
+                    <div class="stat-row">
+                        <span>Health:</span>
+                        <span class="value">100%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Goal:</span>
+                        <span class="value" style="color: #4CAF50;">Harvesting</span>
+                    </div>
+                    <div class="progress-bar"><div class="fill" style="width: 100%"></div></div>
+                </div>
+                
+                <div class="agent-card">
+                    <div class="bot-name">Agent 3</div>
+                    <div class="stat-row">
+                        <span>Health:</span>
+                        <span class="value">100%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Goal:</span>
+                        <span class="value" style="color: #4CAF50;">Harvesting</span>
+                    </div>
+                    <div class="progress-bar"><div class="fill" style="width: 100%"></div></div>
+                </div>
+                
+                <div class="agent-card">
+                    <div class="bot-name">Agent 4</div>
+                    <div class="stat-row">
+                        <span>Health:</span>
+                        <span class="value">100%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Goal:</span>
+                        <span class="value" style="color: #4CAF50;">Harvesting</span>
+                    </div>
+                    <div class="progress-bar"><div class="fill" style="width: 100%"></div></div>
+                </div>
+                
+                <div class="agent-card">
+                    <div class="bot-name">Agent 5</div>
+                    <div class="stat-row">
+                        <span>Health:</span>
+                        <span class="value">100%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Goal:</span>
+                        <span class="value" style="color: #4CAF50;">Harvesting</span>
+                    </div>
+                    <div class="progress-bar"><div class="fill" style="width: 100%"></div></div>
+                </div>
+                
+                <div class="agent-card">
+                    <div class="bot-name">Agent 6</div>
+                    <div class="stat-row">
+                        <span>Health:</span>
+                        <span class="value">100%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Goal:</span>
+                        <span class="value" style="color: #4CAF50;">Harvesting</span>
+                    </div>
+                    <div class="progress-bar"><div class="fill" style="width: 100%"></div></div>
+                </div>
+                
+                <div class="agent-card">
+                    <div class="bot-name">Agent 7</div>
+                    <div class="stat-row">
+                        <span>Health:</span>
+                        <span class="value">100%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Goal:</span>
+                        <span class="value" style="color: #4CAF50;">Harvesting</span>
+                    </div>
+                    <div class="progress-bar"><div class="fill" style="width: 100%"></div></div>
+                </div>
+                
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 40px; background: #1e2128; padding: 20px; border-radius: 6px; border-left: 5px solid #2196F3;">
+                        <h4 style="margin-top:0; color:#2196F3;">💡 Note from Antigravity</h4>
+                        <p style="font-size: 14px; line-height: 1.6;">You are currently training **8 parallel brains** at once. The Radar shows what each agent "perceives" relative to its own position. Whenever you see a red/green dot close to the center, it means an agent has successfully located a resource! The learning speed of <b>0.0 SPS</b> is incredible for a 5700 XT. You've got this!</p>
                     </div>
                 </div>
-
-                <h3>Vision (Raw)</h3>
-                <div class="raw">{
-  "PlayerPosition": {
-    "X": -353.300232,
-    "Y": 35.06869,
-    "Z": -142.942322
-  },
-  "NearestTree": {
-    "Position": {
-      "X": -51.0980835,
-      "Y": -6.638706,
-      "Z": 11.8292389
-    },
-    "Name": "pine_sapling_e_snow"
-  },
-  "NearestOre": {
-    "Position": {
-      "X": -50.8156128,
-      "Y": -6.62857437,
-      "Z": 13.7436218
-    },
-    "Name": "stone-ore"
-  },
-  "Health": 100.0,
-  "HasGathered": false
-}</div>
-                
-                <h3>Actions (Raw)</h3>
-                <div class="raw">{
-  "MoveX": 0.0,
-  "MoveZ": 0.0,
-  "LookX": 0.0,
-  "LookY": 0.0,
-  "Sprint": false,
-  "Jump": false,
-  "Attack": false
-}</div>
             </body>
             </html>
             

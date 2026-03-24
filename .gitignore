@@ -1,23 +1,22 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-.env
-
-# Rust Server
-server/
-shared-data/vision.json
-
-# ML
+# --- SANITIZATION: PROJECT VANGUARD ---
+shared-data/
 models/
-checkpoints/
-runs/
-wandb/
-
-# IDE
+server/
+*.map
+*.sav
+*.db
+tensorboard_logs_v2/
+venv/
+__pycache__/
+*.log
+*.zip
+crash_log.txt
+terminator.log
+hard_count.log
+collection.log
 .gemini/
-.vscode/
-.idea/
-*.swp
-*.swo
+.agents/
+node_modules/
+dist/
+build/
+.env

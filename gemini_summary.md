@@ -1,68 +1,43 @@
 # Gemini Project Summary: Rust RL Agent
 
 ## Project Overview
-This repository contains the development environment for a Rust Reinforcement Learning agent. The goal is to train an agent to interact with the game Rust via a C# plugin and a Python-based RL environment. **No game client is needed** — a server-side bot handles everything autonomously.
+This repository contains the development environment for a Rust Reinforcement Learning agent. The goal is trained an agent to interact with the game Rust via a C# plugin and a Python-based RL environment. **No game client is needed** — a server-side bot handles everything autonomously.
 
-## Latest Changes (2026-03-17)
-- **Project Recovery**: Repaired Rust Dedicated Server via SteamCMD validation.
-- **Autonomous Bot**: Created `BotController.cs` — a Carbon plugin that spawns a server-side bot controlled by the Python agent via `actions.json` / `vision.json`. No Rust game client needed.
-- **Bidirectional Communication**: Python writes `actions.json` → Bot moves → Bot writes `vision.json` → Python reads observations.
-- **Persistent Training**: Integrated W&B (offline mode), checkpointing every 5000 steps, and automatic resume from `models/latest.zip`.
-- **Reward Shaping**: Agent is rewarded with +10 for getting closer to resources (trees/ores) and +100 for a successful "Hit" (gathering).
-- **W&B Integration**: Project name updated to `rust-rl-agent`. Real-time tracking of achievements like `10x Cloth` and `First Wood`.
-- **Map Size**: Reduced to 1500 for faster startup (~2 min vs crash on 3000).
-
-## Current Status (2026-03-18)
-- **RL Training**: Restarted as v1.1 with optimized sprint (1.4x) and reward shaping.
-- **Infrastructure**: Dashboard moved to port 8080.
-- **Remote Access**: Ready via Tailscale.
-- **Brain Sync**: `sync_brain.py` active, watching `checkpoints/` folder.
+## Latest Changes (2026-03-19)
+- **Multi-Bot v0.2.1**: Scaled to 8 parallel bots in a single server instance to saturate AMD 5700 XT compute cores.
+- **Hardware Saturation**: Implemented `SubprocVecEnv` (8 workers) and Extreme Scaling (`batch_size=1024`, `n_epochs=30`).
+- **W&B Sync Fix**: Restored `EMERGENCY_DASHBOARD` prefix for all telemetry, resolving the dashboard stall.
+- **Architecture Overview**: Created `architecture_overview.md` with Mermaid diagrams explaining the indexed JSON handshake.
+- **Map Optimization**: Migrated to `WorldSize 1000` for 100% reliable initialization under 16GB RAM constraints.
 
 ## Current State (PICK UP HERE)
-- **Server**: NOT running. Needs to be started.
-- **Plugins**: `BotController.cs` is deployed to Carbon plugins folder.
-- **Agent**: `environment.py` and `train.py` are ready with SB3 PPO and Monitor wrapper.
-- **Observation space**: 10 features (player XYZ, tree XYZ, ore XYZ, health).
+- **Status**: TRAINING ACTIVE (Step 44,841+).
+- **Environment**: Rust Dedicated Server (Identity: v2_modular, Port: 28015).
+- **RCON**: Active on Port 28016.
+- **Bots**: 8 Bots active (`Bot_0` to `Bot_7`).
+- **GPU**: AMD Radeon RX 5700 XT (DirectML) under active compute load.
 
 ## Step-by-Step Start Guide
 
-### Step 1: Start the Server
+### Step 1: Start the Rust Server (Background)
+Ensure the server is running with the `v2_modular` identity and `server.worldsize 1000`.
+
+### Step 2: Start Training
 ```powershell
 cd C:\Projects\rust-rl-agent
-cmd /c ".\start_server.bat"
-```
-Wait ~2 minutes for `Server startup complete` in the log. The BotController will automatically spawn a bot 5 seconds after server init.
-
-### Step 2: Verify the Bot Spawned
-Check the server log file for `BotController: Bot spawned at`:
-```powershell
-cmd /c "Get-Content -Path C:\Projects\rust-rl-agent\server\steamapps\common\rust_dedicated\rust_server.log -Tail 10"
+cmd /c "venv\Scripts\python ai-agent/train.py"
 ```
 
-### Step 3: Start Training
-```powershell
-cd C:\Projects\rust-rl-agent
-cmd /c ".\venv\Scripts\python ai-agent/train.py"
-```
-W&B will automatically log to the `rust-rl-agent` project.
-
-### Step 4: Monitor
-- W&B Dashboard: Real-time learning curves, survival time, and achievements.
-- Checkpoints: `ai-agent/models/checkpoints/` (every 5,000 steps).
-- Resume model: `ai-agent/models/latest_model.zip`.
-- Server log: `server/steamapps/common/rust_dedicated/rust_server.log`.
+### Step 3: Monitor
+- **W&B Dashboard**: Look for `MultiBot_Extreme_Saturation` run.
+- **Local Dashboard**: `local_dashboard.html` for raw JSON vitals.
+- **GPU**: AMD Adrenaline overlay should show clock spikes every ~20 seconds.
 
 ## Key File Locations
-| File | Path |
+| Component | Path |
 |------|------|
-| Server Start | `C:\Projects\rust-rl-agent\start_server.bat` |
-| Bot Plugin | `rust-plugin/BotController.cs` |
-| Environment | `ai-agent/environment.py` |
-| Training | `ai-agent/train.py` |
-| Vision Data | `shared-data/vision.json` |
-| Actions Data | `shared-data/actions.json` |
-
-## Next Steps
-1. Monitor W&B dashboard for learning curves.
-2. Build a 2D visualizer to watch the bot on a minimap.
-3. Phase 2: Add combat + base building rewards.
+| Multi-Bot Plugin | `rust-plugin/BotController.cs` |
+| Vectorized Env | `ai-agent/environment.py` |
+| Training Loop | `ai-agent/train.py` |
+| Architecture Doc | `architecture_overview.md` |
+| Shared Data | `shared-data/vision_{id}.json` |

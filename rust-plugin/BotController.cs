@@ -59,6 +59,20 @@ namespace Carbon.Plugins
                 var actions = JsonConvert.DeserializeObject<AgentActions>(json);
                 if (actions == null) return;
 
+                if (actions.Respawn)
+                {
+                    _bot.Die();
+                    _bot = null; // Next tick will trigger SpawnBot
+                    return;
+                }
+
+                if (actions.TeleportPos != null)
+                {
+                    Vector3 targetPos = new Vector3(actions.TeleportPos.X, actions.TeleportPos.Y, actions.TeleportPos.Z);
+                    _bot.Teleport(targetPos);
+                    _bot.SendNetworkUpdateImmediate();
+                }
+
                 // Apply movement
                 Vector3 currentPos = _bot.transform.position;
                 Vector3 forward = _bot.transform.forward;
@@ -68,9 +82,9 @@ namespace Carbon.Plugins
                 Vector3 moveDir = (forward * actions.Forward + right * actions.Strafe).normalized;
                 Vector3 newPos = currentPos + moveDir * _moveSpeed * speedMult * 0.1f;
                 newPos.y = TerrainMeta.HeightMap.GetHeight(newPos);
-                _bot.MovePosition(newPos);
+                _bot.transform.position = newPos;
 
-                if (Mathf.Abs(actions.Strafe) > 0.1f)
+                if (Mathf.Abs(actions.Strafe) > 0.1f || Mathf.Abs(actions.Forward) > 0.1f)
                 {
                     _bot.transform.rotation *= Quaternion.Euler(0, actions.Strafe * 45f * 0.1f, 0);
                     _bot.SendNetworkUpdateImmediate();
@@ -157,6 +171,8 @@ namespace Carbon.Plugins
             public float Jump { get; set; } 
             public float Attack { get; set; } 
             public float Sprint { get; set; }
+            public bool Respawn { get; set; }
+            public Vec3 TeleportPos { get; set; }
         }
         public class VisionData { public Vec3 PlayerPosition { get; set; } public EntityInfo NearestTree { get; set; } public EntityInfo NearestOre { get; set; } public float Health { get; set; } public bool HasGathered { get; set; } }
         public class EntityInfo { public Vec3 Position { get; set; } public string Name { get; set; } public EntityInfo(Vector3 relativePos, string name) { Position = new Vec3(relativePos); Name = name; } }

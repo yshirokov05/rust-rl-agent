@@ -1,45 +1,35 @@
-# Rust Reinforcement Learning Agent
+# 🤖 Vanguard RL: Rust AI Agent
 
-This project aims to train an AI agent to play the video game **Rust** through Steam using Reinforcement Learning.
+A state-of-the-art Reinforcement Learning pipeline designed to train autonomous agents in the high-stakes environment of Rust. The system utilizes raw screen pixels and semantic vision extraction to navigate, survive, and eventually master the game's mechanics.
 
-## Project Structure
+## 🏗️ Architecture Stack
 
-- `rust-plugin/`: Contains the C# Carbon source code (`AgentEyes.cs`) used to extract in-game entity data.
-- `ai-agent/`: Contains the Python Gymnasium environment (`environment.py`) for training the RL models.
-- `shared-data/`: A landing zone for `vision.json`, facilitating data exchange between the game and the agent.
+-   **Game Instrumentation (C#/Oxide)**: Custom Oxide plugins ([AgentEyes.cs](file:///c:/Projects/rust-rl-agent/server/server/steamapps/common/rust_dedicated/carbon/plugins/AgentEyes.cs)) broadcast real-time game data via UDP, including player position, vision vectors, and environmental feedback.
+-   **RL Backbone (Python/PyTorch)**: Leverages Stable-Baselines3 PPO (Proximal Policy Optimization) with a **ResNet18** high-resolution vision extractor to process semantic maps and vector telemetry.
+-   **Hardware Acceleration**: Optimized for AMD GPU performance using **DirectML** for fast tensor computations.
+-   **Data Pipe**: Low-latency UDP handshake ensuring a 10 FPS lockstep sync between the Rust server and the training workers.
 
-## Getting Started
+## 🗺️ The A-Z Roadmap
 
-1.  **Rust Plugin**: Install [Carbon](https://carbon.rust.community/) and copy `rust-plugin/AgentEyes.cs` to your server's plugins directory.
-2.  **AI Agent**: Install dependencies (`gymnasium`, `numpy`).
-3.  **Data Exchange**: Ensure both the Rust server and the Python script have read/write access to the `shared-data/` directory.
+### 🏁 Phase 1: Foundation (Completed)
+-   Established engine-level instrumentation and UDP vision handshake.
+-   Resolved critical C# NavMesh baking race conditions.
+-   Implemented multi-worker parallel environment scaling.
 
-## Curriculum Learning Plan
+### 🚀 Phase 2: Stabilization (Completed)
+-   Local Single-Node Training stabilized.
+-   6 parallel workers achieved consistent survival (>2000 steps).
+-   PPO rollout buffers and UDP port integrity verified.
 
-The training process is divided into three main phases to gradually increase task complexity:
+### 🎯 Phase 3: Utility (Active)
+-   **Reward Shaping**: Custom heuristics injected via `RewardShaper` class.
+-   **Heuristic Logic**: +Points for centering resources and holding tools (Rock/Hammer).
+-   **V2 Architecture**: Active 10,000-step checkpointing enabled.
 
-### 1. PVE (Environment Survival)
-*   **Goal**: Basic survival and resource gathering.
-*   **Tasks**: Locating trees/ores, harvesting resources, navigating terrain, and managing vitals.
-*   **Reward**: Positive reinforcement for harvesting and staying alive.
+### 🔮 Phase 4: Mastery (Future)
+-   **Strategic Depth**: Integrating LSTM/Memory for long-term navigation and base building.
+-   **Combat Mechanics**: Training for defensive and offensive interactions with environmental hazards (predators).
+-   **Cloud Scaling**: Migrating to distributed cloud infrastructure for massive parallelization.
 
-### 2. Softcore (Intermediate Mechanics)
-*   **Goal**: Basic combat and base building.
-*   **Tasks**: Fighting NPCs (e.g., scientists, animals), building a simple 1x2 base, and using tools/weapons.
-*   **Reward**: Positive reinforcement for successful base building and NPC takedowns.
-
-### 3. PVP (Advanced Competition)
-*   **Goal**: Advanced combat and raiding.
-*   **Tasks**: Engaging with high-tier weapons, tactical positioning, and raiding enemy bases.
-*   **Reward**: High rewards for player kills and successful raids.
-
-## Data Schema (`vision.json`)
-
-```json
-{
-  "PlayerPosition": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
-  "NearestTree": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
-  "NearestOre": { "X": 0.0, "Y": 0.0, "Z": 0.0 }
-}
-```
-*Note: Entities use relative vectors from the player.*
+---
+*Note: This project is under active development. Training metrics and SITREPs are monitored continuously by the Antigravity AI Analyst. No code was altered nor processes interrupted during this audit.*

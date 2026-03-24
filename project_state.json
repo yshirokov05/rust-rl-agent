@@ -1,5 +1,5 @@
 {
   "last_successful_step_count": 0,
-  "status": "Implementing Multi-Bot Parallelization (8 Agents)",
-  "notes": "Launched background training script with 500k target on AMD DirectML. Awaiting Rust game server initialization."
+  "status": "Training Active (V2 - Reward Shaped)",
+  "notes": "V1 aborted due to reward plateau. V2 launched with RewardShaper (Centering/Possession hooks) and 10k-step checkpointing."
 }

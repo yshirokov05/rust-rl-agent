@@ -1,0 +1,28 @@
+{
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "CPython 3.12.6",
+  "startedAt": "2026-03-19T05:36:21.379691Z",
+  "program": "C:\\Projects\\rust-rl-agent\\ai-agent\\train.py",
+  "codePath": "ai-agent\\train.py",
+  "codePathLocal": "ai-agent\\train.py",
+  "git": {
+    "remote": "https://github.com/yshirokov05/rust-rl-agent",
+    "commit": "1f8bb0559731c22c159a2c101444091eb2eec787"
+  },
+  "email": "yshirokov05@gmail.com",
+  "root": "C:\\Projects\\rust-rl-agent",
+  "host": "DESKTOP-LRTP7RS",
+  "executable": "C:\\Projects\\rust-rl-agent\\venv\\Scripts\\python.exe",
+  "cpu_count": 6,
+  "cpu_count_logical": 6,
+  "disk": {
+    "/": {
+      "total": "498657652736",
+      "used": "388470489088"
+    }
+  },
+  "memory": {
+    "total": "34302423040"
+  },
+  "writerId": "hz9iz2d0x9h6ih8aw8gorx2pjs6ejzms"
+}

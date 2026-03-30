@@ -3,12 +3,12 @@
 ## Project Overview
 This repository contains the development environment for a Rust Reinforcement Learning agent. The goal is trained an agent to interact with the game Rust via a C# plugin and a Python-based RL environment. **No game client is needed** — a server-side bot handles everything autonomously.
 
-## Latest Changes (2026-03-19)
+## Latest Changes (2026-03-26 - v0.3.2)
+- **Surgical Repair (v0.3.2)**: Refactored `BotController.cs` to fully adhere to Manganese Oxide architecture, specifically by removing all direct references to the deprecated `.movement` property and implementing bitwise flag setters (set_onGround, etc.).
+- **Anti-Hack Bypass**: Integrated temporary `IsAdmin` flag assignment for bots during training to prevent server-side rubberbanding and allow for non-human movement patterns.
+- **Vision Restoration**: Resolved a 999.0 distance default in target acquisition, restoring the agent's ability to engage with nearby trees and resources.
 - **Multi-Bot v0.2.1**: Scaled to 8 parallel bots in a single server instance to saturate AMD 5700 XT compute cores.
-- **Hardware Saturation**: Implemented `SubprocVecEnv` (8 workers) and Extreme Scaling (`batch_size=1024`, `n_epochs=30`).
-- **W&B Sync Fix**: Restored `EMERGENCY_DASHBOARD` prefix for all telemetry, resolving the dashboard stall.
 - **Architecture Overview**: Created `architecture_overview.md` with Mermaid diagrams explaining the indexed JSON handshake.
-- **Map Optimization**: Migrated to `WorldSize 1000` for 100% reliable initialization under 16GB RAM constraints.
 
 ## Current State (PICK UP HERE)
 - **Status**: TRAINING ACTIVE (Step 44,841+).

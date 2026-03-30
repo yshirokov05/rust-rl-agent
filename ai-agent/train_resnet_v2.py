@@ -1,6 +1,7 @@
 import os
 import multiprocessing
 import torch
+import glob
 
 try:
     import torch_directml
@@ -96,7 +97,7 @@ if __name__ == '__main__':
         print(f"DirectML init failed, falling back to CPU: {e}")
         device = torch.device('cpu')
 
-    num_envs = 6 # Production Training Mode
+    num_envs = 2 # CPU Diet: Reduced from 6 to prevent CPU starvation
 
     # 2. Vectorized Multi-Processing Environment
     env_fns = [make_env(i) for i in range(num_envs)]
@@ -118,17 +119,35 @@ if __name__ == '__main__':
 
     torch.set_default_dtype(torch.float32) 
     
-    model = PPO(
-        "MultiInputPolicy",
-        env,
-        policy_kwargs=policy_kwargs,
-        n_steps=n_steps,
-        batch_size=batch_size,
-        learning_rate=3e-4,
-        device=device, 
-        verbose=1,
-        tensorboard_log="C:/Projects/ml_logs/tensorboard_logs_v2"
-    )
+    # --- DYNAMIC BRAIN LOADING (PHASE 3) ---
+    checkpoint_dir = "C:/Projects/rust-rl-agent/models/checkpoints_v2"
+    checkpoints = glob.glob(os.path.join(checkpoint_dir, "vanguard_v2_*.zip"))
+    
+    if checkpoints:
+        # Extract step counts to find the true latest save
+        latest_checkpoint = max(checkpoints, key=lambda x: int(os.path.basename(x).split('_')[-2]))
+        print(f"--- [LOADING BRAIN] --- Found overnight progress: {latest_checkpoint}")
+        model = PPO.load(
+            latest_checkpoint, 
+            env=env, 
+            device=device,
+            tensorboard_log="C:/Projects/ml_logs/tensorboard_logs_v2",
+            ent_coef=0.01
+        )
+    else:
+        print("--- [INITIALIZING NEW BRAIN] --- No V2 checkpoints found. Starting from scratch.")
+        model = PPO(
+            "MultiInputPolicy",
+            env,
+            policy_kwargs=policy_kwargs,
+            n_steps=n_steps,
+            batch_size=batch_size,
+            learning_rate=3e-4,
+            ent_coef=0.01,
+            device=device, 
+            verbose=1,
+            tensorboard_log="C:/Projects/ml_logs/tensorboard_logs_v2"
+        )
 
     print(f"Starting Training V2 | Workers: {num_envs} | Model: ResNet18 RGB | BS: {batch_size} | VRAM Lock: ON")
     

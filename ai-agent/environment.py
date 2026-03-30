@@ -132,9 +132,9 @@ class RustEnv(gym.Env):
         predator = 1.0 if data.get('IsPredatorNearby', False) else 0.0
 
         vec_obs = np.array([
-            player['X'], player['Y'], player['Z'],
-            tree_pos['X'], tree_pos['Y'], tree_pos['Z'],
-            ore_pos['X'], ore_pos['Y'], ore_pos['Z'],
+            player['X'] / 1000.0, player['Y'] / 1000.0, player['Z'] / 1000.0, # Scale by world size
+            tree_pos['X'] / 100.0, tree_pos['Y'] / 100.0, tree_pos['Z'] / 100.0, # Scale local neighborhood
+            ore_pos['X'] / 100.0, ore_pos['Y'] / 100.0, ore_pos['Z'] / 100.0,
             health / 100.0,
             wood / 1000.0,
             stone / 1000.0,
@@ -205,9 +205,11 @@ class RustEnv(gym.Env):
         # Phase 1: Gather Wood (Target: 50 wood)
         if wood_count < 50 and not self.has_plan_crafted:
             if self.prev_tree_dist is not None and min_dist < 900:
-                prev_min = min(self.prev_tree_dist, self.prev_ore_dist)
-                if min_dist < prev_min: reward += 1.0
-                elif min_dist > prev_min: reward -= 0.1
+                # [POTENTIAL-BASED REWARD] 
+                # Reward the agent for closing the distance to the target.
+                # Multiplier of 10.0 gives a noticeable signal for small moves.
+                dist_delta = self.prev_tree_dist - tree_dist
+                reward += dist_delta * 10.0
             
             if self.has_gathered and min_dist < interaction_range:
                 reward += 10.0 # Harvesting reward
@@ -238,7 +240,15 @@ class RustEnv(gym.Env):
 
         terminated = False
         truncated = self.steps >= self.max_steps
-        info = { "wood_count": wood_count, "has_plan": self.has_plan_crafted }
+        info = { 
+            "wood_count": wood_count, 
+            "has_plan": self.has_plan_crafted,
+            "last_action": action
+        }
+
+        # [DIAGNOSTIC] Step Audit
+        if self.steps % 100 == 0:
+            print(f"[BOT_{self.port-5000}] Step: {self.steps} | TreeDist: {tree_dist:.2f} | Reward: {reward:.4f} | Action: {action[0:4]}")
 
         return observation, reward, terminated, truncated, info
 

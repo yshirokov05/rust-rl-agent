@@ -1,5 +1,5 @@
 {
-  "last_successful_step_count": 0,
-  "status": "Training Active (V2 - Reward Shaped)",
-  "notes": "V1 aborted due to reward plateau. V2 launched with RewardShaper (Centering/Possession hooks) and 10k-step checkpointing."
+  "last_successful_step_count": 44841,
+  "status": "Stable (v0.3.2) - Ready for Remote Sync",
+  "notes": "BotController.cs repairs complete. Vision blind spots fixed. Movement API refactored for Oxide/Carbon compliance. Ready for long-term training."
 }

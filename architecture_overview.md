@@ -74,3 +74,12 @@ graph TD
 
 - **Weights & Biases**: Real-time cloud dashboard for tracking `live_step`, `SPS`, and environmental achievements (Wood/Cloth harvested).
 - **Local Dashboard**: `local_dashboard.html` provides a zero-latency view of the bots' raw JSON data directly from the `shared-data` folder.
+
+## Project Metrics (Snapshot 2026-03-30)
+
+| Metric | Count |
+|--------|-------|
+| **Git-Tracked Files** | 2,540 |
+| **Total Lines of Code** | 197,032 |
+| **Active Bots** | 8 |
+| **GPU Target** | AMD Radeon RX 5700 XT |

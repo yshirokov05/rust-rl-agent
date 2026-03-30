@@ -29,6 +29,9 @@ class RewardShaper:
         # 2. Possession Reward (Incentivize holding specific tools)
         reward += self._calculate_possession_reward(observation)
         
+        # 3. Aggression Reward (Incentivize swinging at trees)
+        reward += self._calculate_aggression_reward(observation, info)
+        
         # 3. Action Efficiency Reward (Incentivize minimize aimless movement)
         # To be implemented with action history
         
@@ -59,6 +62,31 @@ class RewardShaper:
         
         if (tree_dist < 5.0 or ore_dist < 5.0) and item_id == 3:
             return 0.5
+        return 0.0
+
+    def _calculate_aggression_reward(self, observation, info):
+        """
+        Reward the agent for triggering the Attack action while near a tree.
+        Tightened in V3.1 to prevent 'air-swing' reward hacking.
+        """
+        last_action = info.get("last_action", np.zeros(10))
+        is_attacking = last_action[6] > 0
+        is_moving_forward = last_action[1] > 0.5
+        is_standing_still = np.linalg.norm(last_action[0:2]) < 0.1
+        
+        vec = observation.get("vector", np.zeros(14))
+        tree_dist = np.linalg.norm(vec[3:6])
+        
+        # 1. Aggression Reward (Soften in V3.2: Gradient instead of binary)
+        if is_attacking and is_moving_forward:
+            if tree_dist < 3.0:
+                # Max 0.1 reward when touching, decaying to 0 at 3.0m
+                return 0.1 * (3.0 - tree_dist) / 3.0
+            
+        # 2. Loitering Penalty (V3.1: Penalize stationary attacking)
+        if is_attacking and is_standing_still:
+            return -0.05
+            
         return 0.0
 
     def get_milestone_bonus(self, info):

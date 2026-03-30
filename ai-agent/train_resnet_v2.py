@@ -97,7 +97,7 @@ if __name__ == '__main__':
         print(f"DirectML init failed, falling back to CPU: {e}")
         device = torch.device('cpu')
 
-    num_envs = 2 # CPU Diet: Reduced from 6 to prevent CPU starvation
+    num_envs = 6 # OPTIMIZED: Matches i5-8600k physical core count (6C/6T)
 
     # 2. Vectorized Multi-Processing Environment
     env_fns = [make_env(i) for i in range(num_envs)]
@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     # 3. Memory-Safe Hyperparameters for 8GB VRAM
     n_steps = 512              
-    batch_size = 64            
+    batch_size = 256           # OPTIMIZED: Higher throughput for RX 5700 XT (8GB VRAM)
     buffer_size = n_steps * num_envs 
 
     policy_kwargs = dict(
@@ -161,5 +161,12 @@ if __name__ == '__main__':
     
     callback = CallbackList([custom_callback, checkpoint_callback])
     
-    model.learn(total_timesteps=500000, callback=callback)
-    model.save("C:/Projects/ml_logs/models/rust_vanguard_resnet_v2")
+    try:
+        model.learn(total_timesteps=10_000_000, callback=callback)
+    except KeyboardInterrupt:
+        print("\n--- [TERMINATION DETECTED] --- Graceful shutdown initiated...")
+    finally:
+        save_path = "C:/Projects/ml_logs/models/rust_vanguard_resnet_v2_emergency_save"
+        model.save(save_path)
+        print(f"--- [SAFETY FIRST] --- Brain state secured to: {save_path}")
+        env.close()

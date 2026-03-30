@@ -21,8 +21,13 @@ echo [SUCCESS] Server process detached.
 echo [TIMER] 180 second countdown for Server Initialization...
 timeout /t 180 /nobreak
 
-:: 2. Launch PyTorch Training (Hardcoded Paths)
-echo [ACTION] Launching 2-Worker PyTorch Pipeline...
+:: 2. Launch PyTorch Training (Verified Hardware: i5-8600k / 5700 XT)
+echo [ACTION] Launching 6-Worker Optimized PyTorch Pipeline...
+if not exist "C:\Projects\rust-rl-agent\venv\Scripts\python.exe" (
+    echo [ERROR] Virtual Environment not found at C:\Projects\rust-rl-agent\venv
+    pause
+    exit /b
+)
 start "Vanguard Training" cmd /k ""C:\Projects\rust-rl-agent\venv\Scripts\python.exe" "C:\Projects\rust-rl-agent\ai-agent\train_resnet_v2.py""
 
 :: 3. Launch TensorBoard (Hardcoded Paths)

@@ -1,3 +1,7 @@
+# --- [DIAGNOSTIC ONLY] --- 
+# This is a simplified single-worker script for basic sanity checks.
+# Use 'train_resnet_v2.py' for production ResNet training with multi-bots.
+
 import os
 import time
 import torch_directml

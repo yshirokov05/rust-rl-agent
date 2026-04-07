@@ -2,6 +2,9 @@ import os
 import multiprocessing
 import torch
 import glob
+from pathlib import Path
+
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 
 try:
     import torch_directml
@@ -120,7 +123,7 @@ if __name__ == '__main__':
     torch.set_default_dtype(torch.float32) 
     
     # --- DYNAMIC BRAIN LOADING (PHASE 3) ---
-    checkpoint_dir = "C:/Projects/rust-rl-agent/models/checkpoints_v2"
+    checkpoint_dir = os.path.join(_PROJECT_ROOT, "models", "checkpoints_v2")
     checkpoints = glob.glob(os.path.join(checkpoint_dir, "vanguard_v2_*.zip"))
     
     if checkpoints:
@@ -128,10 +131,10 @@ if __name__ == '__main__':
         latest_checkpoint = max(checkpoints, key=lambda x: int(os.path.basename(x).split('_')[-2]))
         print(f"--- [LOADING BRAIN] --- Found overnight progress: {latest_checkpoint}")
         model = PPO.load(
-            latest_checkpoint, 
-            env=env, 
+            latest_checkpoint,
+            env=env,
             device=device,
-            tensorboard_log="C:/Projects/ml_logs/tensorboard_logs_v2",
+            tensorboard_log=os.path.join(_PROJECT_ROOT, "runs"),
             ent_coef=0.01
         )
     else:
@@ -144,9 +147,9 @@ if __name__ == '__main__':
             batch_size=batch_size,
             learning_rate=3e-4,
             ent_coef=0.01,
-            device=device, 
+            device=device,
             verbose=1,
-            tensorboard_log="C:/Projects/ml_logs/tensorboard_logs_v2"
+            tensorboard_log=os.path.join(_PROJECT_ROOT, "runs")
         )
 
     print(f"Starting Training V2 | Workers: {num_envs} | Model: ResNet18 RGB | BS: {batch_size} | VRAM Lock: ON")
@@ -154,8 +157,8 @@ if __name__ == '__main__':
     # 4. Phase 3: Checkpoint and Tensorboard Callbacks
     custom_callback = TensorboardCallback()
     checkpoint_callback = CheckpointCallback(
-        save_freq=10000, 
-        save_path="C:/Projects/rust-rl-agent/models/checkpoints_v2",
+        save_freq=10000,
+        save_path=os.path.join(_PROJECT_ROOT, "models", "checkpoints_v2"),
         name_prefix="vanguard_v2"
     )
     
@@ -166,7 +169,7 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("\n--- [TERMINATION DETECTED] --- Graceful shutdown initiated...")
     finally:
-        save_path = "C:/Projects/ml_logs/models/rust_vanguard_resnet_v2_emergency_save"
+        save_path = os.path.join(_PROJECT_ROOT, "models", "rust_vanguard_resnet_v2_emergency_save")
         model.save(save_path)
         print(f"--- [SAFETY FIRST] --- Brain state secured to: {save_path}")
         env.close()

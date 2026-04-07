@@ -11,7 +11,10 @@ import torch_directml
 import numpy as np
 import threading
 import queue
+from pathlib import Path
 from stable_baselines3 import PPO
+
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 
 class AsyncLogger:
     def __init__(self):
@@ -27,14 +30,14 @@ class AsyncLogger:
 logger = AsyncLogger()
 
 # --- CONFIGURATION ---
-PID = 11280
-MODEL_PATH = r"C:\Projects\rust-rl-agent\models\v2_checkpoints\final_mastery_model.zip"
-VISION_PATH = r"C:\Projects\rust-rl-agent\shared-data\vision_0.json"
-PROJECT_STATE_PATH = r"C:\Projects\rust-rl-agent\project_state.json"
+PID = None  # Resolved at runtime by scanning for RustDedicated.exe
+MODEL_PATH = os.path.join(_PROJECT_ROOT, "models", "v2_checkpoints", "final_mastery_model.zip")
+VISION_PATH = os.path.join(_PROJECT_ROOT, "shared-data", "vision_0.json")
+PROJECT_STATE_PATH = os.path.join(_PROJECT_ROOT, "project_state.json")
 LOOP_INTERVAL = 0.02  # 50Hz (20ms)
 RAM_THRESHOLD_GB = 2.5
 GPU_THRESHOLD_PERCENT = 5.0
-DEPTH_LOG_DIR = r"C:\Projects\rust-rl-agent\shared-data\depth_logs"
+DEPTH_LOG_DIR = os.path.join(_PROJECT_ROOT, "shared-data", "depth_logs")
 os.makedirs(DEPTH_LOG_DIR, exist_ok=True)
 
 def update_state(status, notes):
@@ -52,7 +55,7 @@ def update_state(status, notes):
 FILE_HANDLES = {}
 
 def get_obs(bot_id):
-    path = f"C:\\Projects\\rust-rl-agent\\shared-data\\vision_{bot_id}.json"
+    path = os.path.join(_PROJECT_ROOT, "shared-data", f"vision_{bot_id}.json")
     if bot_id not in FILE_HANDLES:
         if not os.path.exists(path):
             return None, None, False
@@ -60,24 +63,51 @@ def get_obs(bot_id):
             FILE_HANDLES[bot_id] = open(path, 'rb')
         except:
             return None, None, False
-            
+
     f = FILE_HANDLES[bot_id]
     try:
         f.seek(0)
         data = orjson.loads(f.read())
-        
-        player = data.get('PlayerPosition') or {'X': 0, 'Y': 0, 'Z': 0}
-        tree = data.get('NearestTree', {}).get('Position') or {'X': 0, 'Y': 0, 'Z': 0}
-        ore = data.get('NearestOre', {}).get('Position') or {'X': 0, 'Y': 0, 'Z': 0}
-        health = data.get('Health', 100.0)
 
-        obs = np.array([
-            player['X'], player['Y'], player['Z'],
-            tree['X'], tree['Y'], tree['Z'],
-            ore['X'], ore['Y'], ore['Z'],
-            health / 100.0
+        player = data.get('PlayerPosition') or {'X': 0, 'Y': 0, 'Z': 0}
+        tree_data = data.get('NearestTree') or {}
+        tree = tree_data.get('Position') or {'X': 0, 'Y': 0, 'Z': 0}
+        ore_data = data.get('NearestOre') or {}
+        ore = ore_data.get('Position') or {'X': 0, 'Y': 0, 'Z': 0}
+        health = data.get('Health', 100.0)
+        wood = data.get('WoodCount', 0)
+        stone = data.get('StoneCount', 0)
+        predator = 1.0 if data.get('IsPredatorNearby', False) else 0.0
+        active_item = data.get('ActiveItem', 'none')
+        item_id = 0
+        if 'plan' in active_item: item_id = 1
+        elif 'hammer' in active_item: item_id = 2
+        elif 'rock' in active_item: item_id = 3
+
+        vec_obs = np.array([
+            player['X'] / 1000.0, player['Y'] / 1000.0, player['Z'] / 1000.0,
+            tree['X'] / 100.0, tree['Y'] / 100.0, tree['Z'] / 100.0,
+            ore['X'] / 100.0, ore['Y'] / 100.0, ore['Z'] / 100.0,
+            health / 100.0,
+            wood / 1000.0,
+            stone / 1000.0,
+            predator,
+            item_id / 3.0
         ], dtype=np.float32)
-        
+
+        # Build semantic image from SemanticMapBase64 if present, else zeros
+        b64_map = data.get('SemanticMapBase64', '')
+        if b64_map:
+            import base64
+            import cv2
+            raw_bytes = base64.b64decode(b64_map)
+            map_array = np.frombuffer(raw_bytes, dtype=np.uint8).reshape((84, 84, 3))
+            map_array = cv2.resize(map_array, (224, 224), interpolation=cv2.INTER_NEAREST)
+            image_obs = np.transpose(map_array, (2, 0, 1))
+        else:
+            image_obs = np.zeros((3, 224, 224), dtype=np.uint8)
+
+        obs = {"image": image_obs, "vector": vec_obs}
         return obs, data.get('DepthMatrix'), data.get('HasGathered', False)
     except:
         return None, None, False
@@ -88,7 +118,7 @@ def write_actions(bot_id, action):
     import json
     # action: [Forward, Strafe, LookX, LookY, Sprint, Jump, Attack]
     # BotController expects: { Forward, Strafe, Jump, Attack, Sprint }
-    path = f"C:\\Projects\\rust-rl-agent\\shared-data\\actions_{bot_id}.json"
+    path = os.path.join(_PROJECT_ROOT, "shared-data", f"actions_{bot_id}.json")
     data = {
         "Forward": float(action[0]),
         "Strafe": float(action[1]),
@@ -122,6 +152,8 @@ def write_actions(bot_id, action):
 
 def run_inference(proc_id, bots, cpu_cores=None):
     global PID
+    if PID is None:
+        PID = 0  # Will be resolved below
     
     # CPU Affinity Pinning
     if cpu_cores:
@@ -204,7 +236,7 @@ def run_inference(proc_id, bots, cpu_cores=None):
                 
                 if obs is not None:
                     # Stuck Detection
-                    current_pos = obs[0:3] # Assuming first 3 obs are X,Y,Z
+                    current_pos = obs["vector"][0:3]  # Player X,Y,Z (normalized)
                     stats = bot_stats[bot_id]
                     
                     # STUCK DETECTION (10s Threshold for Jitter)
@@ -213,10 +245,10 @@ def run_inference(proc_id, bots, cpu_cores=None):
                         if dist < 0.1: # Bot hasn't moved significantly
                             if time.time() - stats["last_move"] > 10.0: # Stuck for 10 seconds
                                 logger.log(f"[Proc {proc_id}] Bot_{bot_id} STALLED. Triggering 50-unit JITTER.")
-                                # Perform Jitter calculation here
-                                jx = current_pos[0] + random.uniform(-50, 50)
-                                jz = current_pos[2] + random.uniform(-50, 50)
-                                jy = current_pos[1] + 2.0
+                                # Denormalize from /1000 scale back to world coords
+                                jx = current_pos[0] * 1000.0 + random.uniform(-50, 50)
+                                jz = current_pos[2] * 1000.0 + random.uniform(-50, 50)
+                                jy = current_pos[1] * 1000.0 + 2.0
                                 TELEPORT_QUEUE[bot_id] = [jx, jy, jz]
                                 stats["last_move"] = time.time() # Reset timer
                         else: # Bot moved

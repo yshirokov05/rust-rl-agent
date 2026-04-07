@@ -17,31 +17,31 @@ Training a PPO reinforcement learning agent to survive and navigate the open-wor
 ┌─────────────────────────────────────────────────────────────┐
 │              Python Training Process (SB3)                  │
 │                                                             │
-│   PPO Agent ──── SubprocVecEnv ──── [Env 0 ... Env 7]      │
+│   PPO Agent ──── SubprocVecEnv ──── [Env 0 ... Env 5]      │
 │       │               │                    │                │
-│   DirectML        8 parallel           gymnasium.Env        │
+│   DirectML        6 parallel           gymnasium.Env        │
 │   AMD 5700 XT     workers             wrappers              │
 └──────────────────────────┬──────────────────────────────────┘
                            │  shared-data/ (indexed JSON files)
 ┌──────────────────────────▼──────────────────────────────────┐
 │            Rust Dedicated Server (Carbon v2.1)              │
 │                                                             │
-│   BotController.cs  ──►  Bot_0 ... Bot_7 (8 entities)      │
+│   BotController.cs  ──►  Bot_0 ... Bot_5 (6 entities)      │
 │   AgentEyes.cs      ──►  vision_N.json  (10 FPS write)      │
 │   BotController.cs  ◄──  actions_N.json (policy read)       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Data flow:** The C# Carbon plugin spawns 8 bot entities on the dedicated server. Each bot writes its vision state to an indexed JSON file every 100ms. Eight Python subprocess workers read those files, compute actions via the PPO policy, and write back action commands. The GPU aggregates rollouts from all 8 workers every `n_steps=4096` for a batch update.
+**Data flow:** The C# Carbon plugin spawns bot entities on the dedicated server. Each bot writes its vision state to an indexed JSON file every 100ms. Six Python subprocess workers read those files, compute actions via the PPO policy, and write back action commands. The GPU aggregates rollouts from all 6 workers every `n_steps=512` for a batch update.
 
 ---
 
 ## Key Technical Highlights
 
 - **1.6M+ training timesteps** accumulated across multi-session training with full checkpoint persistence
-- **200+ SPS** (steps per second) — 8-way parallel environment using `SubprocVecEnv`, bypassing Python's GIL via `multiprocessing`
+- **200+ SPS** (steps per second) — 6-way parallel environment using `SubprocVecEnv`, bypassing Python's GIL via `multiprocessing`
 - **ResNet18 vision extractor** processes semantic map inputs from the game server; feature vectors feed directly into the PPO policy head
-- **DirectML GPU acceleration** — targets AMD Radeon RX 5700 XT (8GB VRAM) via `torch_directml`; GPU config: `batch_size=1024`, `n_steps=4096`, `n_epochs=30` (~3.5GB VRAM utilization)
+- **DirectML GPU acceleration** — targets AMD Radeon RX 5700 XT (8GB VRAM) via `torch_directml`; GPU config: `batch_size=256`, `n_steps=512`, `n_epochs=10` (~3.5GB VRAM utilization)
 - **C#/Python indexed handshake** — custom Oxide/Carbon plugin handles bot spawning, NavMesh navigation, and per-bot vision/action file exchange at 10 ticks/second with zero inter-worker collision
 - **191,401 lines of code** across 2,541 tracked files spanning the C# plugin, Python training stack, and server configuration
 - **Weights & Biases integration** — real-time cloud tracking of `live_step`, SPS, and resource harvesting achievements (Wood/Cloth collected per episode)
@@ -100,9 +100,9 @@ AMD GPU required for DirectML. For CUDA, swap `torch_directml` with standard `to
 |---|---|
 | Total timesteps trained | 1,600,000+ |
 | Peak SPS | ~200 steps/sec |
-| Parallel environments | 8 (SubprocVecEnv) |
-| Batch size | 1,024 |
-| n_steps per rollout | 4,096 |
+| Parallel environments | 6 (SubprocVecEnv) |
+| Batch size | 256 |
+| n_steps per rollout | 512 |
 | GPU | AMD RX 5700 XT (DirectML) |
 | VRAM usage | ~3.5 GB / 8 GB |
 | Tracked files | 2,541 |

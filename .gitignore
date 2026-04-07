@@ -20,3 +20,12 @@ node_modules/
 dist/
 build/
 .env
+
+# TensorBoard run artifacts
+runs/
+
+# Temporary / debug files
+dx_info.xml
+dxdiag_output.txt
+forest.txt
+tmp_*.py

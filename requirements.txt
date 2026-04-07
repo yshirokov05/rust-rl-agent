@@ -4,4 +4,10 @@ wandb
 opencv-python
 numpy
 torch
+torchvision
 tensorboard
+torch-directml
+orjson
+psutil
+streamlit
+tqdm

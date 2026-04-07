@@ -11,10 +11,13 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from environment import RustEnv
 import json
+from pathlib import Path
+
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 
 # --- CONFIGURATION ---
 os.environ["WANDB_MODE"] = "disabled"
-CHECKPOINT_DIR = r"C:\Projects\rust-rl-agent\models\v2_checkpoints"
+CHECKPOINT_DIR = os.path.join(_PROJECT_ROOT, "models", "v2_checkpoints")
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 STATS_PATH = os.path.join(CHECKPOINT_DIR, "live_stats.json")
 
@@ -61,7 +64,7 @@ def train():
     env = VecMonitor(env)
 
     # Load Expert Model
-    model_path = os.path.join(CHECKPOINT_DIR, "overnight_win_1591769_steps.zip")
+    model_path = os.path.join(CHECKPOINT_DIR, "overnight_win_1591769_steps.zip")  # Update with your latest checkpoint name
     if os.path.exists(model_path):
         print(f"Loading Expert Model: {model_path}", flush=True)
         model = PPO.load(model_path, env=env, device=device)

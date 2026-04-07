@@ -4,6 +4,10 @@ import numpy as np
 import json
 import os
 import socket
+from pathlib import Path
+
+# Project root is two levels up from this file (ai-agent/ -> rust-rl-agent/)
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 
 class RustEnv(gym.Env):
     """
@@ -14,8 +18,7 @@ class RustEnv(gym.Env):
 
     def __init__(self, bot_id=0, actions_path=None):
         super(RustEnv, self).__init__()
-        root_dir = r"C:\Projects\rust-rl-agent"
-        self.actions_path = actions_path or os.path.join(root_dir, "shared-data", f"actions_{bot_id}.json")
+        self.actions_path = actions_path or os.path.join(_PROJECT_ROOT, "shared-data", f"actions_{bot_id}.json")
         self.steps = 0
         self.max_steps = 2048  # Episode length
         self.prev_tree_dist = None

@@ -1,38 +1,58 @@
 @echo off
-title Vanguard AI: Controller
-color 0A
+setlocal
 
-:: Kill any existing ghosts and python zombies first to free UDP ports
-echo [ACTION] Cleaning up previous processes...
-taskkill /f /im "RustDedicated.exe" >nul 2>&1
-taskkill /f /im "python.exe" /t >nul 2>&1
+set "ROOT=%~dp0"
+set "RUST_RL_SHARED_DATA=%ROOT%shared-data"
+set "RUST_RL_BOT_COUNT=1"
+set "RUST_RL_NUM_ENVS=1"
+set "RUST_RL_INVULNERABLE=true"
+set "RUST_RL_OBSERVATION_TIMEOUT=10"
 
-echo ===================================================
-echo   Vanguard AI: Controller (No-Fail Hardcoded)
-echo ===================================================
-echo.
+if not defined RUST_DEDICATED_EXE set "RUST_DEDICATED_EXE=%ROOT%server\server\steamapps\common\rust_dedicated\RustDedicated.exe"
+set "PYTHON_EXE=%ROOT%venv\Scripts\python.exe"
 
-:: 1. Force a detached server launch (Hardcoded Paths)
-echo [ACTION] Spawning Rust Engine...
-cd /d "C:\Projects\rust-rl-agent"
-start "Rust Server" /min "C:\Projects\rust-rl-agent\server\server\steamapps\common\rust_dedicated\RustDedicated.exe" -batchmode -nographics +server.ip 0.0.0.0 +server.port 28015 +server.tickrate 10 +server.hostname "Vanguard-RL" +server.seed 11111 +server.worldsize 3000 +bundle.path "C:\Projects\rust-rl-agent\server\server\steamapps\common\rust_dedicated\RustDedicated_Data\Bundles" -logfile "C:\Projects\rust-rl-agent\server\server\steamapps\common\rust_dedicated\rust_server.log"
-
-echo [SUCCESS] Server process detached.
-echo [TIMER] 180 second countdown for Server Initialization...
-timeout /t 180 /nobreak
-
-:: 2. Launch PyTorch Training (Verified Hardware: i5-8600k / 5700 XT)
-echo [ACTION] Launching 6-Worker Optimized PyTorch Pipeline...
-if not exist "C:\Projects\rust-rl-agent\venv\Scripts\python.exe" (
-    echo [ERROR] Virtual Environment not found at C:\Projects\rust-rl-agent\venv
-    pause
-    exit /b
+if not exist "%RUST_DEDICATED_EXE%" (
+    echo [ERROR] RustDedicated.exe not found:
+    echo         %RUST_DEDICATED_EXE%
+    echo Set RUST_DEDICATED_EXE to your local server executable.
+    exit /b 1
 )
-start "Vanguard Training" cmd /k ""C:\Projects\rust-rl-agent\venv\Scripts\python.exe" "C:\Projects\rust-rl-agent\ai-agent\train_resnet_v2.py""
 
-:: 3. Launch TensorBoard (Hardcoded Paths)
-echo [ACTION] Launching TensorBoard Server...
-start "Vanguard TensorBoard" "C:\Projects\rust-rl-agent\venv\Scripts\python.exe" -m tensorboard.main --logdir="C:\Projects\ml_logs\tensorboard_logs_v2" --port=6006
+if not exist "%PYTHON_EXE%" (
+    echo [ERROR] Python virtual environment not found:
+    echo         %PYTHON_EXE%
+    echo Create it and install requirements.txt first.
+    exit /b 1
+)
 
-echo [SUCCESS] All systems operational.
-pause
+if not exist "%RUST_RL_SHARED_DATA%" mkdir "%RUST_RL_SHARED_DATA%"
+
+echo [ACTION] Starting private Rust server...
+start "Rust RL Server" /min "%RUST_DEDICATED_EXE%" ^
+    -batchmode -nographics ^
+    +server.ip 127.0.0.1 ^
+    +server.port 28015 ^
+    +server.tickrate 10 ^
+    +server.hostname "Rust RL Private MVP" ^
+    +server.identity "rust-rl-agent"
+
+echo [ACTION] Waiting for Carbon telemetry...
+set /a WAITED=0
+:WAIT_FOR_TELEMETRY
+if exist "%RUST_RL_SHARED_DATA%\vision_0.json" goto START_TRAINING
+if %WAITED% GEQ 180 (
+    echo [ERROR] No telemetry file after 180 seconds.
+    echo Confirm Carbon loaded BotController.cs and RUST_RL_SHARED_DATA is correct.
+    exit /b 1
+)
+timeout /t 1 /nobreak >nul
+set /a WAITED+=1
+goto WAIT_FOR_TELEMETRY
+
+:START_TRAINING
+echo [ACTION] Starting one-bot PPO training...
+start "Rust RL Training" cmd /k ""%PYTHON_EXE%" "%ROOT%ai-agent\train_resnet_v2.py" --num-envs 1 --total-timesteps 1000000 --device auto"
+
+echo [SUCCESS] Server and training processes started.
+echo Use Ctrl+C in the training window to stop and save a checkpoint.
+endlocal

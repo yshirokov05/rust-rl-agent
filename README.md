@@ -1,133 +1,82 @@
-# Vanguard RL: Autonomous Rust Agent
+# Rust RL Agent — MVP
 
-Training a PPO reinforcement learning agent to survive and navigate the open-world survival game Rust — using raw game telemetry, a custom C#/Oxide server plugin, and DirectML-accelerated PyTorch on an AMD GPU. The agent sees only what the game server sees: position vectors, inventory state, and semantic vision maps.
+This project trains a reinforcement-learning policy to control a bot on a private Rust dedicated server.
 
-[![PyTorch](https://img.shields.io/badge/PyTorch-PPO%20%2B%20ResNet18-EE4C2C?style=flat-square&logo=pytorch)](https://pytorch.org/)
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python)](https://python.org/)
-[![DirectML](https://img.shields.io/badge/DirectML-AMD%20RX%205700%20XT-ED1C24?style=flat-square)](https://github.com/microsoft/DirectML)
-[![C#](https://img.shields.io/badge/C%23-Oxide%2FCarbon%20Plugin-239120?style=flat-square&logo=csharp)](https://umod.org/)
-[![SB3](https://img.shields.io/badge/Stable--Baselines3-PPO-FF6F61?style=flat-square)](https://stable-baselines3.readthedocs.io/)
-[![LOC](https://img.shields.io/badge/LOC-191%2C401-blue?style=flat-square)](.)
+The current implementation is a PPO policy, not a large language model. The MVP intentionally starts with one server-side bot, structured telemetry, movement, looking, sprinting, jumping, and attacking. Crafting, building, combat intelligence, and screen-based perception are later milestones.
 
----
+## Current architecture
 
-## Architecture Overview
+1. Carbon spawns one or more RL_Agent entities.
+2. The plugin reads actions_N.json and writes vision_N.json.
+3. Python waits for a newer telemetry Tick before completing each environment step.
+4. Stable-Baselines3 PPO trains a small CNN plus telemetry-vector policy.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│              Python Training Process (SB3)                  │
-│                                                             │
-│   PPO Agent ──── SubprocVecEnv ──── [Env 0 ... Env 5]      │
-│       │               │                    │                │
-│   DirectML        6 parallel           gymnasium.Env        │
-│   AMD 5700 XT     workers             wrappers              │
-└──────────────────────────┬──────────────────────────────────┘
-                           │  shared-data/ (indexed JSON files)
-┌──────────────────────────▼──────────────────────────────────┐
-│            Rust Dedicated Server (Carbon v2.1)              │
-│                                                             │
-│   BotController.cs  ──►  Bot_0 ... Bot_5 (6 entities)      │
-│   AgentEyes.cs      ──►  vision_N.json  (10 FPS write)      │
-│   BotController.cs  ◄──  actions_N.json (policy read)       │
-└─────────────────────────────────────────────────────────────┘
-```
+The protocol is file based for reliability and debuggability. Both sides use atomic replacement, and every payload contains ProtocolVersion, BotId, Tick or StepId, and SessionId.
 
-**Data flow:** The C# Carbon plugin spawns bot entities on the dedicated server. Each bot writes its vision state to an indexed JSON file every 100ms. Six Python subprocess workers read those files, compute actions via the PPO policy, and write back action commands. The GPU aggregates rollouts from all 6 workers every `n_steps=512` for a batch update.
+## Repository layout
 
----
+- ai-agent/protocol.py — protocol constants and atomic JSON helpers
+- ai-agent/environment.py — Gymnasium environment
+- ai-agent/train_resnet_v2.py — repaired PPO entrypoint
+- ai-agent/inference_v3.py — checkpoint inference entrypoint
+- rust-plugin/BotController.cs — Carbon controller and telemetry producer
+- tests/ — protocol and environment smoke tests
+- start_pipeline.bat — Windows launcher for the private MVP
 
-## Key Technical Highlights
+## Requirements
 
-- **1.6M+ training timesteps** accumulated across multi-session training with full checkpoint persistence
-- **200+ SPS** (steps per second) — 6-way parallel environment using `SubprocVecEnv`, bypassing Python's GIL via `multiprocessing`
-- **ResNet18 vision extractor** processes semantic map inputs from the game server; feature vectors feed directly into the PPO policy head
-- **DirectML GPU acceleration** — targets AMD Radeon RX 5700 XT (8GB VRAM) via `torch_directml`; GPU config: `batch_size=256`, `n_steps=512`, `n_epochs=10` (~3.5GB VRAM utilization)
-- **C#/Python indexed handshake** — custom Oxide/Carbon plugin handles bot spawning, NavMesh navigation, and per-bot vision/action file exchange at 10 ticks/second with zero inter-worker collision
-- **191,401 lines of code** across 2,541 tracked files spanning the C# plugin, Python training stack, and server configuration
-- **Weights & Biases integration** — real-time cloud tracking of `live_step`, SPS, and resource harvesting achievements (Wood/Cloth collected per episode)
-- **Custom reward shaping** — `RewardShaper` class with heuristics for resource centering, tool usage (Rock/Hammer hold bonus), and survival duration scaling
+- Windows Rust dedicated server with Carbon installed
+- A private or whitelisted server that you control
+- Python 3.11
+- Stable-Baselines3, Gymnasium, PyTorch, and the packages in requirements.txt
+- DirectML is optional; CPU mode is supported for smoke tests
 
----
+The server installation, shared-data directory, models, checkpoints, and virtual environment are intentionally not committed. Configure their paths locally.
 
-## Project Structure
+## First run
 
-```
-rust-rl-agent/
-├── ai-agent/               # Python training stack
-│   ├── train.py            # PPO training loop (SubprocVecEnv, DirectML)
-│   ├── environment.py      # gymnasium.Env wrapper with bot_id indexing
-│   ├── bc_nature_cnn.py    # ResNet18 vision feature extractor
-│   └── dashboard.py        # Local training monitor
-├── server/                 # Rust dedicated server installation
-├── rust-plugin/            # C# Carbon plugins
-│   ├── BotController.cs    # 8-bot spawner + action executor
-│   └── AgentEyes.cs        # Vision broadcaster (position, inventory, heading)
-├── shared-data/            # Live vision_N.json / actions_N.json exchange
-├── models/                 # Saved PPO checkpoints
-├── scripts/debug/          # 51 diagnostic and utility scripts
-├── start_pipeline.bat      # One-command pipeline launcher
-├── requirements.txt
-└── architecture_overview.md
-```
+From PowerShell:
 
----
+    cd C:\Projects\rust-rl-agent
+    py -3.11 -m venv venv
+    .\venv\Scripts\python.exe -m pip install -r requirements.txt
 
-## Training Pipeline
+Set the bridge variables in the same shell before starting the server:
 
-```bash
-# 1. Start the Rust dedicated server (Carbon loads BotController + AgentEyes automatically)
-# 2. Launch the full Python training stack
-start_pipeline.bat
+    $env:RUST_RL_SHARED_DATA = "C:\Projects\rust-rl-agent\shared-data"
+    $env:RUST_RL_BOT_COUNT = "1"
+    $env:RUST_RL_NUM_ENVS = "1"
+    $env:RUST_RL_INVULNERABLE = "true"
 
-# Or manually:
-cd ai-agent
-python train.py
-```
+Place BotController.cs in Carbon's plugin directory, start the server, and verify that shared-data\vision_0.json is being refreshed.
 
-### Requirements
-```bash
-pip install -r requirements.txt
-# Requires: torch, torch_directml, stable-baselines3, gymnasium, wandb
-```
+Then run a short training validation:
 
-AMD GPU required for DirectML. For CUDA, swap `torch_directml` with standard `torch` CUDA build and update the device string in `train.py`.
+    .\venv\Scripts\python.exe ai-agent\train_resnet_v2.py --num-envs 1 --total-timesteps 10000 --device cpu
 
----
+If that completes and the telemetry values change as expected, run a longer experiment:
 
-## Training Metrics (as of 2026-03-30)
+    .\venv\Scripts\python.exe ai-agent\train_resnet_v2.py --num-envs 1 --total-timesteps 1000000 --device auto
 
-| Metric | Value |
-|---|---|
-| Total timesteps trained | 1,600,000+ |
-| Peak SPS | ~200 steps/sec |
-| Parallel environments | 6 (SubprocVecEnv) |
-| Batch size | 256 |
-| n_steps per rollout | 512 |
-| GPU | AMD RX 5700 XT (DirectML) |
-| VRAM usage | ~3.5 GB / 8 GB |
-| Tracked files | 2,541 |
+The generated checkpoint is models\mvp_checkpoints\rust_mvp_final.zip.
 
----
+## MVP success criterion
+
+Do not judge learning by SPS alone. The first meaningful result is:
+
+- the bot moves toward a detected tree;
+- Attack causes a confirmed inventory increase;
+- wood_count and has_gathered are visible in TensorBoard;
+- the behavior repeats from a new spawn position.
+
+The plugin currently uses direct server-side movement for a controlled experiment. This is not yet equivalent to a normal client playing Rust. Keep it on a private server and do not use it to bypass anti-cheat or interact with public servers.
 
 ## Roadmap
 
-- [x] **Phase 1** — C#/Python bridge, NavMesh baking, multi-worker parallelization
-- [x] **Phase 2** — Training stability, consistent survival >2,000 steps per episode
-- [x] **Phase 3** — ResNet18 vision, reward shaping, resource harvesting behaviors
-- [ ] **Phase 4** — LSTM memory for base building, combat mechanics, cloud-scale training
-
----
-
-## What I Learned
-
-**Bridging two runtimes is harder than bridging two languages.** The C#/Python file handshake looks simple but required careful index isolation, tick-rate alignment, and write-ordering awareness. A race condition across 8 concurrent bots is enough to corrupt an entire training run silently.
-
-**The GIL is a real RL bottleneck.** Switching from `DummyVecEnv` to `SubprocVecEnv` was the single largest performance gain — turning a CPU-bound sequential loop into a genuinely parallel data collection pipeline.
-
-**GPU utilization requires co-tuning.** Getting the 5700 XT to stay above 60% sustained utilization required jointly tuning `batch_size`, `n_steps`, and `n_epochs`. The GPU update phase needs to be computationally heavier than data collection, or you're just waiting on disk I/O.
-
-**RL in a real game engine has no safety rails.** Unit tests don't catch server crashes, NavMesh baking failures, or file desync. Operational rigor — checkpointing, structured logging, and a live monitoring dashboard — is what separates a completed training run from a wasted night.
-
----
-
-**Author:** Yury Shirokov | UC Berkeley Economics + Data Science
+1. One-bot telemetry and confirmed wood gathering.
+2. Real collision-aware movement and explicit resource-hit events.
+3. Crafting and foundation placement with confirmed server events.
+4. Frame stacking or recurrent memory for navigation.
+5. Additional map seeds, spawn positions, weather, and hazards.
+6. Multi-bot rollout collection.
+7. Optional high-level language/VLM planner above the fast low-level policy.

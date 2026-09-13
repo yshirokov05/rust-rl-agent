@@ -8,17 +8,40 @@ using Rust;
 
 namespace Carbon.Plugins
 {
-    [Info("BotController", "RustRL", "1.0.0")]
+    [Info("BotController", "RustRL", "1.1.0")]
     [Description("Private-server MVP controller and telemetry bridge for Rust RL training.")]
     public class BotController : CarbonPlugin
     {
         private const int ProtocolVersion = 1;
         private const float ActionInterval = 0.1f;
+        private const ulong BotUserIdBase = 70000000000000000UL;
 
-        private readonly List<BasePlayer> _bots = new List<BasePlayer>();
-        private readonly Dictionary<int, int> _lastWood = new Dictionary<int, int>();
-        private readonly Dictionary<int, int> _lastStone = new Dictionary<int, int>();
+        private sealed class BotRuntimeState
+        {
+            public readonly int Index;
+            public readonly Vector3 SpawnPoint;
+
+            public BasePlayer Bot;
+            public string SessionId = string.Empty;
+            public int AppliedStepId = -1;
+            public int LastAcceptedTick = -1;
+            public bool InventoryInitialized;
+            public int LastWood;
+            public int LastStone;
+            public int PendingWoodDelta;
+            public int PendingStoneDelta;
+            public string LastError = string.Empty;
+
+            public BotRuntimeState(int index, Vector3 spawnPoint)
+            {
+                Index = index;
+                SpawnPoint = spawnPoint;
+            }
+        }
+
+        private readonly List<BotRuntimeState> _botStates = new List<BotRuntimeState>();
         private readonly List<BaseEntity> _resourceCache = new List<BaseEntity>();
+        private readonly Dictionary<string, float> _nextWarningTime = new Dictionary<string, float>();
 
         private string _sharedDataPath;
         private int _botCount = 1;
@@ -37,20 +60,44 @@ namespace Carbon.Plugins
             _botCount = ReadEnvironmentInt("RUST_RL_BOT_COUNT", 1);
             _botCount = Mathf.Clamp(_botCount, 1, 16);
             _invulnerable = ReadEnvironmentBool("RUST_RL_INVULNERABLE", true);
-            Directory.CreateDirectory(_sharedDataPath);
+
+            try
+            {
+                Directory.CreateDirectory(_sharedDataPath);
+            }
+            catch (Exception exception)
+            {
+                PrintError(
+                    "RustRL: cannot create shared-data directory " +
+                    _sharedDataPath + ": " + exception.Message
+                );
+                return;
+            }
 
             CleanupLegacyBots();
             for (int index = 0; index < _botCount; index++)
             {
-                SpawnBot(index);
+                var state = new BotRuntimeState(index, GetSpawnPoint(index));
+                _botStates.Add(state);
+                SpawnCanonicalBot(state);
             }
 
             timer.Every(ActionInterval, ProcessActionsAndPublish);
             Puts(
                 "RustRL: initialized " + _botCount +
                 " bot(s), shared data at " + _sharedDataPath +
-                ", invulnerable=" + _invulnerable
+                ", invulnerable=" + _invulnerable +
+                ". A new SessionId with Reset=true and StepId=0 is required."
             );
+        }
+
+        private Vector3 GetSpawnPoint(int index)
+        {
+            float spawnX = 195.0f + (index * 1.5f);
+            float spawnZ = 145.0f;
+            Vector3 spawnPoint = new Vector3(spawnX, 0f, spawnZ);
+            spawnPoint.y = TerrainMeta.HeightMap.GetHeight(spawnPoint);
+            return spawnPoint;
         }
 
         private void CleanupLegacyBots()
@@ -58,14 +105,14 @@ namespace Carbon.Plugins
             var toKill = new List<BaseEntity>();
             foreach (var player in BasePlayer.activePlayerList)
             {
-                if (player != null && player.displayName.Contains("RL_Agent"))
+                if (IsOwnedBot(player))
                 {
                     toKill.Add(player);
                 }
             }
             foreach (var player in BasePlayer.sleepingPlayerList)
             {
-                if (player != null && player.displayName.Contains("RL_Agent"))
+                if (IsOwnedBot(player) && !toKill.Contains(player))
                 {
                     toKill.Add(player);
                 }
@@ -79,138 +126,438 @@ namespace Carbon.Plugins
             }
         }
 
-        private void SpawnBot(int index)
+        private static bool IsOwnedBot(BasePlayer player)
         {
-            float spawnX = 195.0f + (index * 1.5f);
-            float spawnZ = 145.0f;
-            Vector3 spawnPoint = new Vector3(spawnX, 0, spawnZ);
-            spawnPoint.y = TerrainMeta.HeightMap.GetHeight(spawnPoint);
+            return player != null &&
+                   player.displayName != null &&
+                   player.displayName.StartsWith(
+                       "RL_Agent_",
+                       StringComparison.Ordinal
+                   );
+        }
 
+        private bool SpawnCanonicalBot(BotRuntimeState state)
+        {
             var bot = GameManager.server.CreateEntity(
                 "assets/prefabs/player/player.prefab",
-                spawnPoint,
+                state.SpawnPoint,
                 Quaternion.identity
             ) as BasePlayer;
 
             if (bot == null)
             {
-                Puts("RustRL: failed to create bot " + index);
-                return;
+                SetStateError(
+                    state,
+                    "spawn",
+                    "failed to create player prefab for bot " + state.Index
+                );
+                return false;
             }
 
+            // Set identity before Spawn so the server never sees duplicate
+            // userID zero bots and diagnostics have a stable display name.
+            bot.userID = BotUserIdBase + (ulong)state.Index;
+            bot.displayName = "RL_Agent_" + state.Index;
+            bot.syncPosition = true;
             bot.Spawn();
+
             var movement = bot.GetComponent<PlayerWalkMovement>();
             if (movement != null)
             {
                 UnityEngine.Object.Destroy(movement);
             }
 
-            bot.EndSleeping();
-            bot.displayName = "RL_Agent_" + index;
-            bot.InitializeHealth(_invulnerable ? 99999f : 100f, _invulnerable ? 99999f : 100f);
-            bot.health = _invulnerable ? 99999f : 100f;
-            bot.metabolism.calories.value = 1000f;
-            bot.metabolism.hydration.value = 1000f;
-
-            timer.Once(1f, delegate
+            state.Bot = bot;
+            if (!RestoreCanonicalState(state))
             {
-                if (bot == null || bot.IsDestroyed)
-                {
-                    return;
-                }
+                return false;
+            }
 
+            Puts(
+                "RustRL: spawned RL_Agent_" + state.Index +
+                " at " + state.SpawnPoint
+            );
+            return true;
+        }
+
+        private bool ResetBot(BotRuntimeState state)
+        {
+            var bot = state.Bot;
+            if (bot == null || bot.IsDestroyed || bot.IsDead())
+            {
+                if (bot != null && !bot.IsDestroyed)
+                {
+                    bot.Kill();
+                }
+                state.Bot = null;
+                return SpawnCanonicalBot(state);
+            }
+
+            return RestoreCanonicalState(state);
+        }
+
+        private bool RestoreCanonicalState(BotRuntimeState state)
+        {
+            var bot = state.Bot;
+            if (bot == null || bot.IsDestroyed)
+            {
+                SetStateError(
+                    state,
+                    "reset-missing-bot",
+                    "cannot reset missing bot " + state.Index
+                );
+                return false;
+            }
+
+            try
+            {
                 bot.EndSleeping();
-                var rock = ItemManager.CreateByName("rock", 1);
-                if (rock != null)
-                {
-                    rock.MoveToContainer(bot.inventory.containerBelt, 0);
-                    bot.UpdateActiveItem(rock.uid);
-                    bot.SendNetworkUpdateImmediate();
-                }
-            });
+                bot.MovePosition(state.SpawnPoint);
+                bot.transform.rotation = Quaternion.identity;
+                bot.viewAngles = Vector3.zero;
+                bot.TransformChanged();
 
-            _bots.Add(bot);
-            Puts("RustRL: spawned RL_Agent_" + index + " at " + spawnPoint);
+                float canonicalHealth = _invulnerable ? 99999f : 100f;
+                bot.InitializeHealth(canonicalHealth, canonicalHealth);
+                bot.health = canonicalHealth;
+                RestoreMetabolism(bot);
+
+                bot.modelState.flags |= (int)ModelState.Flag.OnGround;
+                bot.modelState.flags &= ~(int)ModelState.Flag.Sprinting;
+                bot.modelState.flags &= ~(int)ModelState.Flag.Jumped;
+
+                if (bot.inventory == null || bot.inventory.containerBelt == null)
+                {
+                    SetStateError(
+                        state,
+                        "reset-inventory",
+                        "inventory was unavailable for bot " + state.Index
+                    );
+                    return false;
+                }
+
+                bot.inventory.Strip();
+                var rock = ItemManager.CreateByName("rock", 1);
+                if (rock == null)
+                {
+                    SetStateError(
+                        state,
+                        "reset-rock",
+                        "failed to create starter rock for bot " + state.Index
+                    );
+                    return false;
+                }
+
+                rock.MoveToContainer(bot.inventory.containerBelt, 0);
+                bot.UpdateActiveItem(rock.uid);
+                bot.SendNetworkUpdateImmediate();
+
+                var activeItem = bot.GetActiveItem();
+                if (activeItem == null ||
+                    activeItem.info == null ||
+                    activeItem.info.shortname != "rock")
+                {
+                    SetStateError(
+                        state,
+                        "reset-equip",
+                        "starter rock was not active for bot " + state.Index
+                    );
+                    return false;
+                }
+
+                state.InventoryInitialized = true;
+                state.LastWood = GetInventoryAmount(bot, "wood");
+                state.LastStone = GetInventoryAmount(bot, "stones");
+                state.PendingWoodDelta = 0;
+                state.PendingStoneDelta = 0;
+                state.LastError = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                SetStateError(
+                    state,
+                    "reset-exception",
+                    "canonical reset failed for bot " + state.Index +
+                    ": " + exception.Message
+                );
+                return false;
+            }
         }
 
         private void ProcessActionsAndPublish()
         {
             _tickCount++;
+
             if (Time.time >= _nextResourceScan)
             {
-                RefreshResourceCache();
+                try
+                {
+                    RefreshResourceCache();
+                }
+                catch (Exception exception)
+                {
+                    WarnRateLimited(
+                        "resource-scan",
+                        "RustRL: resource scan failed: " + exception.Message
+                    );
+                }
                 _nextResourceScan = Time.time + 1.0f;
             }
 
-            for (int index = 0; index < _bots.Count; index++)
+            foreach (var state in _botStates)
             {
-                var bot = _bots[index];
-                var actions = ReadAction(index);
-
-                if (bot == null || bot.IsDestroyed)
+                try
                 {
-                    WriteTelemetry(index, null, actions, false);
-                    continue;
+                    ProcessBot(state);
                 }
-
-                if (bot.IsDead())
+                catch (Exception exception)
                 {
-                    WriteTelemetry(index, bot, actions, false);
-                    continue;
+                    SetStateError(
+                        state,
+                        "tick-exception",
+                        "bot " + state.Index + " tick failed: " +
+                        exception.Message
+                    );
+                    PublishTelemetrySafe(state);
                 }
-
-                int woodBefore = GetInventoryAmount(bot, "wood");
-                int stoneBefore = GetInventoryAmount(bot, "stones");
-
-                if (_invulnerable)
-                {
-                    bot.health = 99999f;
-                    bot.metabolism.calories.value = 1000f;
-                    bot.metabolism.hydration.value = 1000f;
-                }
-
-                ApplyAction(bot, actions);
-
-                int woodAfter = GetInventoryAmount(bot, "wood");
-                int stoneAfter = GetInventoryAmount(bot, "stones");
-                bool gathered = woodAfter > woodBefore || stoneAfter > stoneBefore;
-                _lastWood[index] = woodAfter;
-                _lastStone[index] = stoneAfter;
-
-                WriteTelemetry(index, bot, actions, gathered);
             }
         }
 
-        private Dictionary<string, object> ReadAction(int index)
+        private void ProcessBot(BotRuntimeState state)
         {
-            string path = Path.Combine(_sharedDataPath, "actions_" + index + ".json");
+            var bot = state.Bot;
+            if (IsAlive(bot))
+            {
+                CaptureInventoryDeltas(state, bot);
+                if (_invulnerable)
+                {
+                    bot.health = 99999f;
+                    RestoreMetabolism(bot);
+                }
+            }
+
+            Dictionary<string, object> actions;
+            if (TryReadAction(state, out actions))
+            {
+                TryAcceptAction(state, actions);
+            }
+
+            bot = state.Bot;
+            if (IsAlive(bot))
+            {
+                // Capture both synchronous changes and delayed strikes that
+                // completed after a previous action tick.
+                CaptureInventoryDeltas(state, bot);
+            }
+
+            PublishTelemetrySafe(state);
+        }
+
+        private bool TryReadAction(
+            BotRuntimeState state,
+            out Dictionary<string, object> actions
+        )
+        {
+            actions = null;
+            string path = Path.Combine(
+                _sharedDataPath,
+                "actions_" + state.Index + ".json"
+            );
+
             if (!File.Exists(path))
             {
-                return new Dictionary<string, object>();
+                return false;
             }
 
             try
             {
-                var parsed = JsonConvert.DeserializeObject<Dictionary<string, object>>(
+                actions = JsonConvert.DeserializeObject<Dictionary<string, object>>(
                     File.ReadAllText(path)
                 );
-                return parsed ?? new Dictionary<string, object>();
+                if (actions == null)
+                {
+                    SetStateError(
+                        state,
+                        "action-null",
+                        "action file contained JSON null for bot " + state.Index
+                    );
+                    return false;
+                }
+                return true;
             }
-            catch (Exception)
+            catch (Exception exception)
             {
-                return new Dictionary<string, object>();
+                SetStateError(
+                    state,
+                    "action-read",
+                    "failed to read action file for bot " + state.Index +
+                    ": " + exception.Message
+                );
+                return false;
             }
         }
 
-        private void ApplyAction(
-            BasePlayer bot,
+        private void TryAcceptAction(
+            BotRuntimeState state,
             Dictionary<string, object> actions
         )
         {
-            float moveX = ReadFloat(actions, "MoveX", ReadFloat(actions, "Strafe", 0f));
-            float moveZ = ReadFloat(actions, "MoveZ", ReadFloat(actions, "Forward", 0f));
-            float lookX = ReadFloat(actions, "LookX", 0f);
-            float lookY = ReadFloat(actions, "LookY", 0f);
+            int actionProtocol = ReadInt(actions, "ProtocolVersion", -1);
+            int actionBotId = ReadInt(actions, "BotId", -1);
+            int stepId = ReadInt(actions, "StepId", -1);
+            string sessionId = ReadString(actions, "SessionId", string.Empty);
+            bool reset = ReadBool(actions, "Reset", false);
+
+            if (actionProtocol != ProtocolVersion)
+            {
+                RejectAction(
+                    state,
+                    "protocol",
+                    "expected ProtocolVersion " + ProtocolVersion +
+                    ", received " + actionProtocol
+                );
+                return;
+            }
+            if (actionBotId != state.Index)
+            {
+                RejectAction(
+                    state,
+                    "bot-id",
+                    "expected BotId " + state.Index +
+                    ", received " + actionBotId
+                );
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
+                RejectAction(state, "session", "SessionId must be non-empty");
+                return;
+            }
+            if (stepId < 0)
+            {
+                RejectAction(state, "step-negative", "StepId must be non-negative");
+                return;
+            }
+
+            if (reset)
+            {
+                if (stepId != 0)
+                {
+                    RejectAction(
+                        state,
+                        "reset-step",
+                        "Reset=true requires StepId=0"
+                    );
+                    return;
+                }
+
+                if (sessionId == state.SessionId)
+                {
+                    // A duplicate reset file is already acknowledged. Do not
+                    // clear inventory repeatedly while Python is initializing.
+                    return;
+                }
+
+                if (!ResetBot(state))
+                {
+                    return;
+                }
+
+                state.SessionId = sessionId;
+                state.AppliedStepId = 0;
+                state.LastAcceptedTick = _tickCount;
+                state.LastError = string.Empty;
+                Puts(
+                    "RustRL: bot " + state.Index +
+                    " reset for session " + sessionId
+                );
+                return;
+            }
+
+            if (sessionId != state.SessionId)
+            {
+                RejectAction(
+                    state,
+                    "session-change",
+                    "a new SessionId must begin with Reset=true and StepId=0"
+                );
+                return;
+            }
+
+            if (stepId <= state.AppliedStepId)
+            {
+                // Re-reading an accepted atomic file is expected while PPO
+                // updates. Never apply that physical action twice.
+                return;
+            }
+
+            int expectedStep = state.AppliedStepId + 1;
+            if (stepId != expectedStep)
+            {
+                RejectAction(
+                    state,
+                    "step-gap",
+                    "expected StepId " + expectedStep +
+                    ", received " + stepId
+                );
+                return;
+            }
+
+            if (!IsAlive(state.Bot))
+            {
+                RejectAction(
+                    state,
+                    "bot-dead",
+                    "bot is unavailable; start a new session with Reset=true"
+                );
+                return;
+            }
+
+            // Accept before applying. If a version-sensitive Rust API throws
+            // after partially moving the bot, the physical action must not run
+            // again on the next 100 ms tick.
+            state.AppliedStepId = stepId;
+            state.LastAcceptedTick = _tickCount;
+            state.LastError = string.Empty;
+            try
+            {
+                ApplyAction(state, actions);
+            }
+            catch (Exception exception)
+            {
+                SetStateError(
+                    state,
+                    "action-apply",
+                    "accepted StepId " + stepId +
+                    " but action application failed: " + exception.Message
+                );
+            }
+        }
+
+        private void RejectAction(
+            BotRuntimeState state,
+            string category,
+            string reason
+        )
+        {
+            SetStateError(
+                state,
+                "reject-" + category,
+                "rejected action for bot " + state.Index + ": " + reason
+            );
+        }
+
+        private void ApplyAction(
+            BotRuntimeState state,
+            Dictionary<string, object> actions
+        )
+        {
+            var bot = state.Bot;
+            float moveX = ReadBoundedFloat(actions, "MoveX", -1f, 1f, 0f);
+            float moveZ = ReadBoundedFloat(actions, "MoveZ", -1f, 1f, 0f);
+            float lookX = ReadBoundedFloat(actions, "LookX", -1f, 1f, 0f);
+            float lookY = ReadBoundedFloat(actions, "LookY", -1f, 1f, 0f);
             bool sprint = ReadBool(actions, "Sprint", false);
             bool jump = ReadBool(actions, "Jump", false);
             bool attack = ReadBool(actions, "Attack", false);
@@ -226,14 +573,18 @@ namespace Carbon.Plugins
             bot.modelState.flags &= ~(int)ModelState.Flag.Sprinting;
             bot.modelState.flags &= ~(int)ModelState.Flag.Jumped;
 
-            if (Mathf.Abs(moveX) > 0.05f || Mathf.Abs(moveZ) > 0.05f)
+            Vector3 localInput = Vector3.ClampMagnitude(
+                new Vector3(moveX, 0f, moveZ),
+                1f
+            );
+            if (localInput.sqrMagnitude > 0.0025f)
             {
-                Vector3 direction = (
-                    bot.transform.forward * moveZ +
-                    bot.transform.right * moveX
-                ).normalized;
+                Vector3 direction =
+                    bot.transform.forward * localInput.z +
+                    bot.transform.right * localInput.x;
                 float speed = 5f * (sprint ? 1.4f : 1f);
-                Vector3 nextPosition = bot.transform.position + direction * speed * ActionInterval;
+                Vector3 nextPosition =
+                    bot.transform.position + direction * speed * ActionInterval;
                 nextPosition.y = TerrainMeta.HeightMap.GetHeight(nextPosition);
                 bot.MovePosition(nextPosition);
                 bot.TransformChanged();
@@ -252,37 +603,95 @@ namespace Carbon.Plugins
 
             if (attack)
             {
-                var melee = bot.GetActiveItem()?.GetHeldEntity() as BaseMelee;
-                if (melee != null)
+                var activeItem = bot.GetActiveItem();
+                var melee = activeItem == null
+                    ? null
+                    : activeItem.GetHeldEntity() as BaseMelee;
+                if (melee == null)
                 {
+                    SetStateError(
+                        state,
+                        "attack-held-entity",
+                        "Attack requested but the active item had no BaseMelee held entity"
+                    );
+                }
+                else
+                {
+                    // ServerUse is Rust's server-side AI melee path. Its exact
+                    // gather behavior must be proven on the installed build.
                     melee.ServerUse();
                 }
-                bot.SignalBroadcast(BaseEntity.Signal.Attack, string.Empty);
             }
 
             bot.SendNetworkUpdateImmediate();
         }
 
-        private void WriteTelemetry(
-            int index,
-            BasePlayer bot,
-            Dictionary<string, object> actions,
-            bool gathered
+        private void CaptureInventoryDeltas(
+            BotRuntimeState state,
+            BasePlayer bot
         )
         {
-            bool alive = bot != null && !bot.IsDestroyed && !bot.IsDead();
-            int appliedStep = ReadInt(actions, "StepId", -1);
-            string sessionId = ReadString(actions, "SessionId", string.Empty);
+            int wood = GetInventoryAmount(bot, "wood");
+            int stone = GetInventoryAmount(bot, "stones");
+
+            if (!state.InventoryInitialized)
+            {
+                state.LastWood = wood;
+                state.LastStone = stone;
+                state.InventoryInitialized = true;
+                return;
+            }
+
+            int woodDelta = wood - state.LastWood;
+            int stoneDelta = stone - state.LastStone;
+            if (woodDelta > 0)
+            {
+                state.PendingWoodDelta = SaturatingAdd(
+                    state.PendingWoodDelta,
+                    woodDelta
+                );
+            }
+            if (stoneDelta > 0)
+            {
+                state.PendingStoneDelta = SaturatingAdd(
+                    state.PendingStoneDelta,
+                    stoneDelta
+                );
+            }
+
+            state.LastWood = wood;
+            state.LastStone = stone;
+        }
+
+        private static int SaturatingAdd(int left, int right)
+        {
+            if (right > 0 && left > int.MaxValue - right)
+            {
+                return int.MaxValue;
+            }
+            return left + right;
+        }
+
+        private void WriteTelemetry(BotRuntimeState state)
+        {
+            var bot = state.Bot;
+            bool alive = IsAlive(bot);
+            int woodDelta = state.PendingWoodDelta;
+            int stoneDelta = state.PendingStoneDelta;
 
             var payload = new Dictionary<string, object>
             {
                 { "ProtocolVersion", ProtocolVersion },
-                { "BotId", index },
+                { "BotId", state.Index },
                 { "Tick", _tickCount },
-                { "AppliedStepId", appliedStep },
-                { "SessionId", sessionId },
+                { "AppliedStepId", state.AppliedStepId },
+                { "SessionId", state.SessionId },
+                { "LastAcceptedTick", state.LastAcceptedTick },
+                { "ResetRequired", string.IsNullOrEmpty(state.SessionId) || !alive },
                 { "Alive", alive },
-                { "HasGathered", gathered },
+                { "HasGathered", woodDelta > 0 || stoneDelta > 0 },
+                { "WoodDelta", woodDelta },
+                { "StoneDelta", stoneDelta },
                 { "Health", alive ? Mathf.Clamp(bot.health, 0f, 100f) : 0f },
                 { "WoodCount", alive ? GetInventoryAmount(bot, "wood") : 0 },
                 { "StoneCount", alive ? GetInventoryAmount(bot, "stones") : 0 },
@@ -293,13 +702,41 @@ namespace Carbon.Plugins
                 { "PlayerPitch", alive ? bot.viewAngles.x : 0f },
                 { "NearestTree", alive ? FindNearestResource(bot, true) : null },
                 { "NearestOre", alive ? FindNearestResource(bot, false) : null },
-                { "SemanticMapBase64", string.Empty }
+                { "SemanticMapBase64", string.Empty },
+                { "LastError", state.LastError }
             };
 
-            WriteJsonAtomic(
-                Path.Combine(_sharedDataPath, "vision_" + index + ".json"),
+            if (WriteJsonAtomic(
+                state,
+                Path.Combine(
+                    _sharedDataPath,
+                    "vision_" + state.Index + ".json"
+                ),
                 payload
-            );
+            ))
+            {
+                // Keep deltas across a failed replacement and clear them only
+                // after one complete telemetry payload is published.
+                state.PendingWoodDelta = 0;
+                state.PendingStoneDelta = 0;
+            }
+        }
+
+        private void PublishTelemetrySafe(BotRuntimeState state)
+        {
+            try
+            {
+                WriteTelemetry(state);
+            }
+            catch (Exception exception)
+            {
+                SetStateError(
+                    state,
+                    "telemetry-build",
+                    "failed to build telemetry for bot " + state.Index +
+                    ": " + exception.Message
+                );
+            }
         }
 
         private void RefreshResourceCache()
@@ -359,12 +796,15 @@ namespace Carbon.Plugins
                 return null;
             }
 
-            Vector3 relative = nearest.transform.position - bot.transform.position;
+            Vector3 worldRelative =
+                nearest.transform.position - bot.transform.position;
+            Vector3 botLocal =
+                bot.transform.InverseTransformDirection(worldRelative);
             return new Dictionary<string, object>
             {
                 { "Name", GetPrefabName(nearest) },
                 { "Distance", nearestDistance },
-                { "Position", Position(relative) }
+                { "Position", Position(botLocal) }
             };
         }
 
@@ -383,15 +823,17 @@ namespace Carbon.Plugins
                    name.Contains("pine") ||
                    name.Contains("birch") ||
                    name.Contains("palm") ||
-                   name.Contains("cactus");
+                   name.Contains("cactus") ||
+                   name.Contains("oak") ||
+                   name.Contains("douglas");
         }
 
         private static bool IsOreName(string name)
         {
-            return name.Contains("ore") ||
-                   name.Contains("stone-ore") ||
+            return name.Contains("stone-ore") ||
                    name.Contains("metal-ore") ||
-                   name.Contains("sulfur-ore");
+                   name.Contains("sulfur-ore") ||
+                   name.Contains("ore.prefab");
         }
 
         private static Dictionary<string, object> Position(Vector3 value)
@@ -402,6 +844,21 @@ namespace Carbon.Plugins
                 { "Y", value.y },
                 { "Z", value.z }
             };
+        }
+
+        private static bool IsAlive(BasePlayer bot)
+        {
+            return bot != null && !bot.IsDestroyed && !bot.IsDead();
+        }
+
+        private static void RestoreMetabolism(BasePlayer bot)
+        {
+            if (bot.metabolism == null)
+            {
+                return;
+            }
+            bot.metabolism.calories.value = 1000f;
+            bot.metabolism.hydration.value = 1000f;
         }
 
         private static string GetActiveItemName(BasePlayer bot)
@@ -439,12 +896,30 @@ namespace Carbon.Plugins
 
             try
             {
-                return Convert.ToSingle(raw, CultureInfo.InvariantCulture);
+                float value = Convert.ToSingle(raw, CultureInfo.InvariantCulture);
+                return float.IsNaN(value) || float.IsInfinity(value)
+                    ? fallback
+                    : value;
             }
             catch (Exception)
             {
                 return fallback;
             }
+        }
+
+        private static float ReadBoundedFloat(
+            Dictionary<string, object> values,
+            string key,
+            float minimum,
+            float maximum,
+            float fallback
+        )
+        {
+            return Mathf.Clamp(
+                ReadFloat(values, key, fallback),
+                minimum,
+                maximum
+            );
         }
 
         private static int ReadInt(
@@ -544,7 +1019,8 @@ namespace Carbon.Plugins
             return angle;
         }
 
-        private static void WriteJsonAtomic(
+        private bool WriteJsonAtomic(
+            BotRuntimeState state,
             string path,
             Dictionary<string, object> payload
         )
@@ -565,9 +1041,16 @@ namespace Carbon.Plugins
                 {
                     File.Move(temporary, path);
                 }
+                return true;
             }
-            catch (Exception)
+            catch (Exception exception)
             {
+                SetStateError(
+                    state,
+                    "telemetry-write",
+                    "failed to publish telemetry for bot " + state.Index +
+                    " to " + path + ": " + exception.Message
+                );
                 try
                 {
                     if (File.Exists(temporary))
@@ -575,23 +1058,59 @@ namespace Carbon.Plugins
                         File.Delete(temporary);
                     }
                 }
-                catch (Exception)
+                catch (Exception cleanupException)
                 {
-                    // Best-effort cleanup; the next server tick retries.
+                    WarnRateLimited(
+                        "telemetry-cleanup-" + state.Index,
+                        "RustRL: failed to remove temporary telemetry file " +
+                        temporary + ": " + cleanupException.Message
+                    );
                 }
+                return false;
             }
+        }
+
+        private void SetStateError(
+            BotRuntimeState state,
+            string category,
+            string message
+        )
+        {
+            state.LastError = message;
+            WarnRateLimited(
+                category + "-" + state.Index,
+                "RustRL: " + message
+            );
+        }
+
+        private void WarnRateLimited(
+            string key,
+            string message,
+            float intervalSeconds = 5f
+        )
+        {
+            float now = Time.realtimeSinceStartup;
+            float next;
+            if (_nextWarningTime.TryGetValue(key, out next) && now < next)
+            {
+                return;
+            }
+
+            _nextWarningTime[key] = now + intervalSeconds;
+            PrintWarning(message);
         }
 
         private void Unload()
         {
-            foreach (var bot in _bots)
+            foreach (var state in _botStates)
             {
+                var bot = state.Bot;
                 if (bot != null && !bot.IsDestroyed)
                 {
                     bot.Kill();
                 }
             }
-            _bots.Clear();
+            _botStates.Clear();
         }
     }
 }

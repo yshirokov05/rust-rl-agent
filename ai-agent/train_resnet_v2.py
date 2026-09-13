@@ -29,7 +29,9 @@ try:
     import torch_directml
 
     HAS_DIRECTML = True
-except ImportError:
+except Exception:
+    # CPU training must remain available when an optional DirectML install is
+    # missing or its native runtime cannot load on this machine.
     torch_directml = None
     HAS_DIRECTML = False
 
@@ -69,9 +71,9 @@ class RustFeaturesExtractor(BaseFeaturesExtractor):
         self._features_dim = 192
 
     def forward(self, observations: dict[str, torch.Tensor]) -> torch.Tensor:
-        image = observations["image"].float()
-        if image.detach().amax() > 1.0:
-            image = image / 255.0
+        # normalize_images=False leaves uint8 values untouched in SB3.
+        # Normalize deterministically rather than branching on image contents.
+        image = observations["image"].float() / 255.0
         visual_features = self.visual(image)
         vector_features = self.vector(observations["vector"].float())
         return torch.cat((visual_features, vector_features), dim=1)
@@ -91,26 +93,62 @@ class ShapedRustEnv(RustEnv):
 class TelemetryCallback(BaseCallback):
     def __init__(self, verbose=0):
         super().__init__(verbose)
+        self.gather_events_total = 0
+        self.wood_delta_total = 0.0
+
+    @staticmethod
+    def _finite_metric(info, key):
+        value = info.get(key)
+        if value is None:
+            return None
+        try:
+            result = float(value)
+        except (TypeError, ValueError):
+            return None
+        return result if np.isfinite(result) else None
 
     def _on_step(self) -> bool:
         infos = self.locals.get("infos", [])
-        if infos:
-            wood = [
-                float(info["wood_count"])
-                for info in infos
-                if "wood_count" in info
-            ]
-            gathered = [
-                int(info["has_gathered"])
-                for info in infos
-                if "has_gathered" in info
-            ]
-            if wood:
-                self.logger.record("rust/wood_count_avg", float(np.mean(wood)))
-            if gathered:
-                self.logger.record(
-                    "rust/gathered_ratio", float(np.mean(gathered))
+        for info in infos:
+            wood_count = self._finite_metric(info, "wood_count")
+            if wood_count is not None:
+                self.logger.record_mean("rust/wood_count_avg", wood_count)
+
+            if "has_gathered" in info:
+                gathered = float(bool(info["has_gathered"]))
+                self.logger.record_mean("rust/gathered_ratio", gathered)
+                if gathered:
+                    self.gather_events_total += 1
+
+            wood_delta = self._finite_metric(info, "wood_delta")
+            if wood_delta is not None:
+                self.logger.record_mean("rust/wood_delta_avg", wood_delta)
+                self.wood_delta_total += max(0.0, wood_delta)
+
+            tree_distance = self._finite_metric(info, "tree_distance_m")
+            if tree_distance is not None:
+                self.logger.record_mean(
+                    "rust/tree_distance_m_avg", tree_distance
                 )
+
+            ack_latency = self._finite_metric(info, "ack_latency_ms")
+            if ack_latency is not None:
+                self.logger.record_mean(
+                    "rust/ack_latency_ms_avg", ack_latency
+                )
+
+            timeout_count = self._finite_metric(info, "telemetry_timeouts")
+            if timeout_count is not None:
+                self.logger.record_mean(
+                    "rust/telemetry_timeouts_avg", timeout_count
+                )
+
+        # These monotonically increasing run totals preserve sparse events
+        # even when the logger dumps only once per PPO rollout.
+        self.logger.record(
+            "rust/gather_events_total", self.gather_events_total
+        )
+        self.logger.record("rust/wood_delta_total", self.wood_delta_total)
         return True
 
 

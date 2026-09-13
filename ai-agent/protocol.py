@@ -55,6 +55,8 @@ def build_action_payload(
     bot_id: int,
     step_id: int,
     session_id: str,
+    *,
+    reset: bool = False,
 ) -> dict[str, Any]:
     """Convert a policy action into the canonical JSON action payload."""
     values = list(action)
@@ -69,6 +71,7 @@ def build_action_payload(
         "BotId": int(bot_id),
         "StepId": int(step_id),
         "SessionId": str(session_id),
+        "Reset": bool(reset),
         "MoveX": max(-1.0, min(1.0, numeric[0])),
         "MoveZ": max(-1.0, min(1.0, numeric[1])),
         "LookX": max(-1.0, min(1.0, numeric[2])),

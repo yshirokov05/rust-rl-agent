@@ -9,29 +9,45 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ai-agent"))
 
-try:
-    from environment import RustEnv
-    from protocol import atomic_write_json, read_json
-    ENV_IMPORT_ERROR = None
-except Exception as exc:
-    RustEnv = None
-    atomic_write_json = None
-    read_json = None
-    ENV_IMPORT_ERROR = exc
+from environment import RustEnv
+from protocol import ACTION_SIZE, atomic_write_json, read_json
+from reward_shaping import RewardShaper
 
 
-@unittest.skipIf(
-    ENV_IMPORT_ERROR is not None,
-    f"Gymnasium environment dependencies unavailable: {ENV_IMPORT_ERROR}",
-)
 class EnvironmentContractTests(unittest.TestCase):
     @staticmethod
-    def telemetry(tick, session_id, wood=0, gathered=False):
+    def telemetry(
+        tick,
+        session_id,
+        *,
+        applied_step_id=0,
+        protocol_version=1,
+        bot_id=0,
+        wood=0,
+        gathered=False,
+        tree_distance=2.0,
+        ore_distance=None,
+        last_error="",
+    ):
+        tree = None
+        if tree_distance is not None:
+            tree = {
+                "Name": "pine_a",
+                "Distance": tree_distance,
+                "Position": {"X": 0, "Y": 0, "Z": tree_distance},
+            }
+        ore = None
+        if ore_distance is not None:
+            ore = {
+                "Name": "stone-ore_a",
+                "Distance": ore_distance,
+                "Position": {"X": ore_distance, "Y": 0, "Z": 0},
+            }
         return {
-            "ProtocolVersion": 1,
-            "BotId": 0,
+            "ProtocolVersion": protocol_version,
+            "BotId": bot_id,
             "Tick": tick,
-            "AppliedStepId": tick,
+            "AppliedStepId": applied_step_id,
             "SessionId": session_id,
             "Alive": True,
             "HasGathered": gathered,
@@ -40,63 +56,321 @@ class EnvironmentContractTests(unittest.TestCase):
             "StoneCount": 0,
             "ActiveItem": "rock",
             "PlayerPosition": {"X": 0, "Y": 0, "Z": 0},
-            "NearestTree": {
-                "Name": "pine_a",
-                "Distance": 2,
-                "Position": {"X": 0, "Y": 0, "Z": 2},
-            },
-            "NearestOre": None,
+            "NearestTree": tree,
+            "NearestOre": ore,
+            "LastError": last_error,
         }
 
-    def test_step_waits_for_new_tick(self):
+    def start_reset_ack(self, env, tick, *, previous_session, **telemetry_kwargs):
+        action_path = env.actions_path
+        vision_path = env.vision_path
+        result = {}
+
+        def publish():
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline:
+                action = read_json(action_path)
+                if (
+                    action is not None
+                    and action.get("Reset") is True
+                    and action.get("StepId") == 0
+                    and action.get("SessionId") != previous_session
+                ):
+                    result["action"] = action
+                    atomic_write_json(
+                        vision_path,
+                        self.telemetry(
+                            tick,
+                            action["SessionId"],
+                            applied_step_id=0,
+                            **telemetry_kwargs,
+                        ),
+                    )
+                    return
+                time.sleep(0.001)
+            result["error"] = "reset action was not published"
+
+        publisher = threading.Thread(target=publish)
+        publisher.start()
+        return publisher, result
+
+    def start_step_ack(self, env, step_id, tick, **telemetry_kwargs):
+        action_path = env.actions_path
+        vision_path = env.vision_path
+        session_id = env.session_id
+        result = {}
+
+        def publish():
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline:
+                action = read_json(action_path)
+                if (
+                    action is not None
+                    and action.get("Reset") is False
+                    and action.get("StepId") == step_id
+                    and action.get("SessionId") == session_id
+                ):
+                    result["action"] = action
+                    atomic_write_json(
+                        vision_path,
+                        self.telemetry(
+                            tick,
+                            session_id,
+                            applied_step_id=step_id,
+                            **telemetry_kwargs,
+                        ),
+                    )
+                    return
+                time.sleep(0.001)
+            result["error"] = "normal action was not published"
+
+        publisher = threading.Thread(target=publish)
+        publisher.start()
+        return publisher, result
+
+    def reset_env(self, env, tick=10, **telemetry_kwargs):
+        previous_session = env.session_id
+        publisher, result = self.start_reset_ack(
+            env,
+            tick,
+            previous_session=previous_session,
+            **telemetry_kwargs,
+        )
+        observation, info = env.reset(seed=123)
+        publisher.join(timeout=1.0)
+        self.assertFalse(publisher.is_alive())
+        self.assertNotIn("error", result)
+        self.assertNotEqual(env.session_id, previous_session)
+        return observation, info, result["action"]
+
+    def test_reset_starts_new_session_and_requires_exact_reset_ack(self):
         with tempfile.TemporaryDirectory() as directory:
             env = RustEnv(
                 bot_id=0,
                 shared_data_dir=directory,
                 observation_timeout=1.0,
-                poll_interval=0.002,
+                poll_interval=0.001,
                 episode_length_range=(10, 10),
             )
-            session_id = env.session_id
-            vision_path = Path(directory) / "vision_0.json"
-            action_path = Path(directory) / "actions_0.json"
-
+            old_session = env.session_id
             atomic_write_json(
-                vision_path,
-                self.telemetry(0, session_id),
+                env.vision_path,
+                self.telemetry(
+                    999,
+                    old_session,
+                    applied_step_id=0,
+                ),
             )
-            observation, reset_info = env.reset()
-            self.assertEqual(reset_info["tick"], 0)
-            self.assertEqual(observation["vector"].shape, (14,))
 
-            def publish_next_tick():
-                deadline = time.monotonic() + 0.5
+            observation, info, action = self.reset_env(env, tick=10)
+
+            self.assertEqual(info["tick"], 10)
+            self.assertEqual(info["applied_step_id"], 0)
+            self.assertTrue(action["Reset"])
+            self.assertEqual(action["SessionId"], env.session_id)
+            self.assertTrue(env.observation_space.contains(observation))
+
+            first_session = env.session_id
+            _, second_info, _ = self.reset_env(env, tick=11)
+            self.assertNotEqual(env.session_id, first_session)
+            self.assertEqual(second_info["tick"], 11)
+            env.close()
+
+    def test_step_ignores_stale_tick_wrong_ack_session_version_and_bot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env = RustEnv(
+                bot_id=0,
+                shared_data_dir=directory,
+                observation_timeout=1.0,
+                poll_interval=0.001,
+                episode_length_range=(10, 10),
+            )
+            self.reset_env(env, tick=10)
+            session_id = env.session_id
+
+            def publish_candidates():
+                deadline = time.monotonic() + 1.0
                 while time.monotonic() < deadline:
-                    action = read_json(action_path)
+                    action = read_json(env.actions_path)
                     if action is not None and action.get("StepId") == 1:
-                        atomic_write_json(
-                            vision_path,
-                            self.telemetry(
-                                1,
-                                session_id,
-                                wood=50,
-                                gathered=True,
-                            ),
-                        )
-                        return
-                    time.sleep(0.002)
+                        break
+                    time.sleep(0.001)
+                else:
+                    return
 
-            publisher = threading.Thread(target=publish_next_tick)
+                candidates = [
+                    self.telemetry(11, "wrong-session", applied_step_id=1),
+                    self.telemetry(12, session_id, applied_step_id=0),
+                    self.telemetry(10, session_id, applied_step_id=1),
+                    self.telemetry(
+                        13,
+                        session_id,
+                        applied_step_id=1,
+                        protocol_version=2,
+                    ),
+                    self.telemetry(
+                        14,
+                        session_id,
+                        applied_step_id=1,
+                        bot_id=1,
+                    ),
+                    self.telemetry(
+                        15,
+                        session_id,
+                        applied_step_id=1,
+                        wood=50,
+                        gathered=True,
+                    ),
+                ]
+                for payload in candidates:
+                    atomic_write_json(env.vision_path, payload)
+                    time.sleep(0.015)
+
+            publisher = threading.Thread(target=publish_candidates)
             publisher.start()
             _, reward, terminated, truncated, info = env.step(
-                np.zeros(7, dtype=np.float32)
+                np.zeros(ACTION_SIZE, dtype=np.float32)
             )
-            publisher.join(timeout=1)
+            publisher.join(timeout=1.0)
 
-            self.assertEqual(info["tick"], 1)
-            self.assertGreater(reward, 0)
+            self.assertEqual(info["tick"], 15)
+            self.assertEqual(info["applied_step_id"], 1)
+            self.assertGreater(reward, 0.0)
             self.assertFalse(terminated)
             self.assertFalse(truncated)
+            env.close()
+
+    def test_environment_progress_reward_is_tree_only_and_meter_based(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env = RustEnv(
+                bot_id=0,
+                shared_data_dir=directory,
+                observation_timeout=1.0,
+                poll_interval=0.001,
+                episode_length_range=(10, 10),
+            )
+            self.reset_env(env, tick=10, tree_distance=10.0, ore_distance=10.0)
+
+            publisher, result = self.start_step_ack(
+                env,
+                1,
+                11,
+                tree_distance=9.0,
+                ore_distance=1.0,
+            )
+            _, reward, _, _, info = env.step(
+                np.zeros(ACTION_SIZE, dtype=np.float32)
+            )
+            publisher.join(timeout=1.0)
+            self.assertNotIn("error", result)
+            self.assertAlmostEqual(info["tree_dist"], 9.0)
+            self.assertAlmostEqual(info["ore_dist"], 1.0)
+            self.assertAlmostEqual(reward, 0.01, places=6)
+
+            publisher, result = self.start_step_ack(
+                env,
+                2,
+                12,
+                tree_distance=None,
+                ore_distance=0.1,
+            )
+            _, reward, _, _, _ = env.step(
+                np.zeros(ACTION_SIZE, dtype=np.float32)
+            )
+            publisher.join(timeout=1.0)
+            self.assertNotIn("error", result)
+            self.assertAlmostEqual(reward, -0.01, places=6)
+            env.close()
+
+    def test_reward_shaper_never_rewards_missing_or_ore_only_resource(self):
+        shaper = RewardShaper()
+        observation = {
+            "vector": np.array([0.0] * 13 + [1.0], dtype=np.float32)
+        }
+        forward_attack = np.array(
+            [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            dtype=np.float32,
+        )
+
+        missing_info = {
+            "tree_available": False,
+            "tree_distance_m": None,
+            "ore_available": True,
+            "ore_distance_m": 1.0,
+            "last_action": forward_attack,
+        }
+        self.assertEqual(
+            shaper.get_shaping_reward(observation, missing_info),
+            0.0,
+        )
+
+        far_tree_info = {
+            "tree_available": True,
+            "tree_distance_m": 300.0,
+            "last_action": forward_attack,
+        }
+        self.assertEqual(
+            shaper.get_shaping_reward(observation, far_tree_info),
+            0.0,
+        )
+
+        near_tree_info = {
+            "tree_available": True,
+            "tree_distance_m": 2.0,
+            "last_action": forward_attack,
+        }
+        self.assertGreater(
+            shaper.get_shaping_reward(observation, near_tree_info),
+            0.05,
+        )
+
+    def test_persistent_wood_count_catches_delayed_gather(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env = RustEnv(
+                bot_id=0,
+                shared_data_dir=directory,
+                observation_timeout=1.0,
+                poll_interval=0.001,
+                episode_length_range=(10, 10),
+            )
+            self.reset_env(env, tick=10, wood=0, gathered=False)
+            publisher, result = self.start_step_ack(
+                env,
+                1,
+                11,
+                wood=25,
+                gathered=False,
+            )
+            _, reward, _, _, info = env.step(
+                np.zeros(ACTION_SIZE, dtype=np.float32)
+            )
+            publisher.join(timeout=1.0)
+            self.assertNotIn("error", result)
+            self.assertEqual(info["wood_delta"], 25.0)
+            self.assertTrue(info["has_gathered"])
+            self.assertGreater(reward, 9.0)
+            env.close()
+
+    def test_matching_ack_with_bridge_error_fails_the_transition(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env = RustEnv(
+                bot_id=0,
+                shared_data_dir=directory,
+                observation_timeout=1.0,
+                poll_interval=0.001,
+                episode_length_range=(10, 10),
+            )
+            self.reset_env(env, tick=10)
+            publisher, result = self.start_step_ack(
+                env,
+                1,
+                11,
+                last_error="accepted StepId 1 but movement failed",
+            )
+            with self.assertRaisesRegex(RuntimeError, "movement failed"):
+                env.step(np.zeros(ACTION_SIZE, dtype=np.float32))
+            publisher.join(timeout=1.0)
+            self.assertNotIn("error", result)
             env.close()
 
 

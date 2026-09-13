@@ -20,15 +20,26 @@ class ProtocolTests(unittest.TestCase):
             bot_id=2,
             step_id=17,
             session_id="session-a",
+            reset=True,
         )
         self.assertEqual(ACTION_SIZE, 7)
         self.assertEqual(payload["ProtocolVersion"], 1)
         self.assertEqual(payload["BotId"], 2)
         self.assertEqual(payload["StepId"], 17)
         self.assertEqual(payload["SessionId"], "session-a")
+        self.assertTrue(payload["Reset"])
         self.assertTrue(payload["Sprint"])
         self.assertFalse(payload["Jump"])
         self.assertTrue(payload["Attack"])
+
+    def test_normal_action_does_not_request_reset(self):
+        payload = build_action_payload(
+            [0.0] * ACTION_SIZE,
+            bot_id=0,
+            step_id=1,
+            session_id="session-a",
+        )
+        self.assertFalse(payload["Reset"])
 
     def test_wrong_action_size_is_rejected(self):
         with self.assertRaises(ValueError):

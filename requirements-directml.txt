@@ -1,0 +1,9 @@
+# Install this file into a separate venv-dml environment on native Windows.
+# torch-directml is public-preview software and currently pins the older
+# PyTorch 2.4.1 ABI, so do not install it over the CPU-first venv.
+numpy==1.26.4
+gymnasium==0.29.1
+stable-baselines3==2.4.1
+torch==2.4.1
+tensorboard==2.17.1
+torch-directml==0.2.5.dev240914; platform_system == "Windows"

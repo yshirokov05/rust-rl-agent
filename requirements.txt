@@ -1,13 +1,8 @@
-stable-baselines3
-gymnasium
-wandb
-opencv-python
-numpy
-torch
-torchvision
-tensorboard
-torch-directml
-orjson
-psutil
-streamlit
-tqdm
+# Reproducible CPU-first MVP stack for Python 3.11.
+# DirectML requires an older PyTorch tuple and therefore has its own isolated
+# environment in requirements-directml.txt.
+numpy==2.4.6
+gymnasium==1.3.0
+stable-baselines3==2.9.0
+torch==2.14.0
+tensorboard==2.21.0

@@ -13,6 +13,7 @@ import json
 import math
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -28,6 +29,8 @@ ACTION_FIELDS = (
     "Attack",
 )
 ACTION_SIZE = len(ACTION_FIELDS)
+ATOMIC_REPLACE_ATTEMPTS = 8
+ATOMIC_REPLACE_INITIAL_DELAY_SECONDS = 0.002
 
 
 def resolve_shared_data_dir(shared_data_dir: str | os.PathLike[str] | None = None) -> Path:
@@ -83,7 +86,12 @@ def build_action_payload(
 
 
 def atomic_write_json(path: str | os.PathLike[str], payload: Mapping[str, Any]) -> None:
-    """Write JSON via a same-directory temporary file and atomic replacement."""
+    """Write JSON via a same-directory temporary file and atomic replacement.
+
+    Windows can briefly deny ``os.replace`` while another process or thread has
+    the destination open. Retry only those transient sharing/access failures;
+    other filesystem errors still fail immediately.
+    """
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
 
@@ -102,7 +110,20 @@ def atomic_write_json(path: str | os.PathLike[str], payload: Mapping[str, Any]) 
             )
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary_name, destination)
+        delay = ATOMIC_REPLACE_INITIAL_DELAY_SECONDS
+        for attempt in range(ATOMIC_REPLACE_ATTEMPTS):
+            try:
+                os.replace(temporary_name, destination)
+                break
+            except OSError as error:
+                transient_windows_error = (
+                    isinstance(error, PermissionError)
+                    or getattr(error, "winerror", None) in {5, 32}
+                )
+                if not transient_windows_error or attempt == ATOMIC_REPLACE_ATTEMPTS - 1:
+                    raise
+                time.sleep(delay)
+                delay = min(delay * 2.0, 0.05)
     finally:
         try:
             os.unlink(temporary_name)

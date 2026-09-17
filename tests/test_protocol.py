@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ai-agent"))
 
@@ -58,6 +59,31 @@ class ProtocolTests(unittest.TestCase):
                 read_json(path),
                 {"Tick": 3, "Alive": True},
             )
+
+    def test_atomic_json_retries_transient_windows_replace_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "payload.json"
+            original_replace = __import__("os").replace
+            attempts = 0
+
+            def flaky_replace(source, destination):
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    error = PermissionError("destination is temporarily in use")
+                    error.winerror = 5
+                    raise error
+                return original_replace(source, destination)
+
+            with (
+                mock.patch("protocol.os.replace", side_effect=flaky_replace),
+                mock.patch("protocol.time.sleep") as sleep,
+            ):
+                atomic_write_json(path, {"Tick": 4})
+
+            self.assertEqual(attempts, 2)
+            sleep.assert_called_once()
+            self.assertEqual(read_json(path), {"Tick": 4})
 
 
 if __name__ == "__main__":

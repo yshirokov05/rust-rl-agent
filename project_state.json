@@ -1,5 +1,8 @@
 {
-  "last_successful_step_count": 44841,
-  "status": "Stable (v0.3.2) - Ready for Remote Sync",
-  "notes": "BotController.cs repairs complete. Vision blind spots fixed. Movement API refactored for Oxide/Carbon compliance. Ready for long-term training."
+  "status": "MVP bridge repaired; live Carbon/Rust validation pending",
+  "branch": "repair/mvp-training-pipeline",
+  "python_tests": "14 passing, zero skips",
+  "current_milestone": "One bot: exact bridge acknowledgements and confirmed wood gain",
+  "next_milestone": "Behavior-tree NPC skills: gather, craft, build, survive, fight",
+  "notes": "The PPO controller is a tested research component. It is not yet a complete autonomous Rust NPC, and the live dedicated-server smoke gates must pass before training claims are made."
 }

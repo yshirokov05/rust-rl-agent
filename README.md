@@ -161,6 +161,10 @@ $env:RUST_RL_DEVICE = "cpu"
 
 The final checkpoint is written under `models\mvp_checkpoints`. `Ctrl+C` in the training window triggers the trainer's last-exit checkpoint path.
 
+## Long-term NPC direction
+
+This repository currently validates a narrow PPO controller and server bridge. The intended autonomous-companion direction is modular: a behavior-tree or utility planner will eventually compose server-confirmed gathering, crafting, building, survival, and combat skills. That future NPC track is not yet implemented, and no claim of full Rust autonomy should be made until each skill passes an integration test.
+
 ## Current limitations
 
 - semantic image telemetry is currently empty;

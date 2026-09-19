@@ -46,3 +46,17 @@ The default trainer uses one DummyVecEnv and a small CNN/vector encoder. Stable-
 - visual screen capture or a human-equivalent camera observation
 - adversarial players and general Rust survival
 - language-model planning
+
+
+## Future autonomous NPC track
+
+The long-term goal is a modular Rust companion/NPC, not one monolithic LLM policy. After the one-bot PPO bridge is proven, add server-confirmed skills behind a behavior-tree or utility planner:
+
+1. perceive nearby entities and maintain a blackboard;
+2. navigate to resources and gather them;
+3. craft tools and equipment;
+4. choose legal building locations and construct a base;
+5. manage survival needs and threats;
+6. fight NPCs or players using dedicated combat controllers.
+
+PPO may improve individual skills such as aiming or navigation. Language-model planning is optional and belongs above these skills; it must not directly control every low-level movement tick.

@@ -26,6 +26,7 @@ if not defined RUST_DEDICATED_EXE set "RUST_DEDICATED_EXE=%ROOT%server\server\st
 if not defined RUST_RL_PYTHON_EXE set "RUST_RL_PYTHON_EXE=%ROOT%venv\Scripts\python.exe"
 
 for %%I in ("%RUST_DEDICATED_EXE%") do set "RUST_SERVER_DIR=%%~dpI"
+if not defined RUST_RL_BUNDLE_PATH if exist "%RUST_SERVER_DIR%Bundles" set "RUST_RL_BUNDLE_PATH=%RUST_SERVER_DIR%Bundles"
 if not defined RUST_RL_BUNDLE_PATH set "RUST_RL_BUNDLE_PATH=%RUST_SERVER_DIR%RustDedicated_Data\Bundles"
 
 if not "%RUST_RL_BOT_COUNT%"=="%RUST_RL_NUM_ENVS%" (

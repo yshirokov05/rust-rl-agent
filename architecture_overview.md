@@ -1,85 +1,62 @@
-# Rust RL Architecture: Multi-Bot Parallelization
+# Rust RL Agent — Repaired MVP Architecture
 
-This document explains the high-performance training architecture implemented for the Rust Reinforcement Learning agent (v2_modular) using an AMD 5700 XT.
+## Scope
 
-## System Overview
+The first milestone is a one-bot, private-server experiment. The objective is to make the environment contract observable and testable before scaling rollout collection.
 
-The system transitions from a single-agent bottleneck to an **8-way parallel stream** to maximize GPU compute saturation.
+## Data flow
 
-```mermaid
-graph TD
-    subgraph "Python Training Loop (SB3)"
-        PPO[PPO Agent]
-        SVE[SubprocVecEnv]
-        W1[Env Worker 0]
-        W2[Env Worker 1]
-        W8[Env Worker 7]
-    end
+    Carbon BotController
+        |
+        | atomic vision_0.json, Tick, SessionId
+        v
+    RustEnv.reset/step
+        |
+        | action_0.json, StepId, SessionId
+        v
+    Carbon BotController
 
-    subgraph "Shared Host I/O"
-        V0[vision_0.json]
-        A0[actions_0.json]
-        V1[vision_1.json]
-        A1[actions_1.json]
-        V7[vision_7.json]
-        A7[actions_7.json]
-    end
+A step is valid only when Python receives a newer Tick and the telemetry belongs to the current SessionId. Partial JSON writes and stale frames are rejected.
 
-    subgraph "Rust Game Server (Carbon v2.1)"
-        BC[BotController Plugin]
-        B0[Bot 0]
-        B1[Bot 1]
-        B7[Bot 7]
-    end
+## Canonical action contract
 
-    subgraph "GPU Acceleration"
-        DML[DirectML / AMD 5700 XT]
-    end
+    [MoveX, MoveZ, LookX, LookY, Sprint, Jump, Attack]
 
-    %% Data Flow
-    W1 <--> V0 & A0
-    W2 <--> V1 & A1
-    W8 <--> V7 & A7
-    V0 & A0 <--> B0
-    V1 & A1 <--> B1
-    V7 & A7 <--> B7
-    PPO <--> SVE
-    SVE <--> W1 & W2 & W8
-    PPO --- DML
-```
+The values are seven float32 values in [-1, 1]. Sprint, Jump, and Attack are interpreted as boolean thresholds by the protocol. Crafting, hotbar selection, and building are intentionally not exposed until the server confirms those events.
 
-## Core Components
+## Observation contract
 
-### 1. The Carbon Plugin (`BotController.cs`)
-- **Multi-Bot Management**: Spawns 8 autonomous entities (`Bot_0` to `Bot_7`) on server initialization.
-- **Indexed Handshake**: Each bot listens specifically to its own action file (e.g., `actions_3.json`) and reports its vision to its own vision file (e.g., `vision_3.json`).
-- **Low Latency**: Runs on a 100ms timer (10 ticks/sec), providing high-frequency updates to the agent.
+The MVP returns:
 
-### 2. The Python Environment (`environment.py`)
-- **Vectorized Wrapper**: Implements the `gymnasium.Env` interface with a `bot_id` parameter.
-- **Zero-Wait Step**: Removed all `time.sleep` calls to allow the Python workers to spin at maximum CPU speed during data collection.
+- image: 3 x 84 x 84 uint8 semantic map; zeros are allowed until semantic-map generation is added
+- vector: 14 float32 values containing player position, relative nearest tree and ore positions, health, wood, stone, predator flag, and active-item ID
+- telemetry info: Tick, AppliedStepId, Alive, HasGathered, inventory counts, and resource names
 
-### 3. The Training Loop (`train.py`)
-- **SubprocVecEnv**: Uses Python's `multiprocessing` to run 8 environments in parallel. This bypasses the Global Interpreter Lock (GIL) and allows massive data collection speed.
-- **Extreme Scaling**:
-    - `batch_size = 1024`: Large matrices to saturate the AMD 5700 XT compute units.
-    - `n_steps = 4096`: Collects a massive amount of data before the "GPU Update Phase."
-    - `n_epochs = 30`: Forces the GPU to perform 30 passes over the data to keep power consumption and clocks high.
+Nearest resource positions are relative to the bot. The plugin uses an atomic temporary-file replacement when publishing telemetry.
 
-### 4. DirectML Integration
-- Uses `torch_directml` to target the AMD Radeon RX 5700 XT.
-- **VRAM Utilization**: Uses ~3.5GB of the 8GB available, leaving plenty of headroom for the high-resolution Rust server assets.
+## Training
 
-## Monitoring
+The default trainer uses one DummyVecEnv and a small CNN/vector encoder. Stable-Baselines3 MultiInputPolicy is used because the observation space is a Dict. Set RUST_RL_NUM_ENVS above one only after one-bot training works. SubprocVecEnv remains available for later parallel rollouts.
 
-- **Weights & Biases**: Real-time cloud dashboard for tracking `live_step`, `SPS`, and environmental achievements (Wood/Cloth harvested).
-- **Local Dashboard**: `local_dashboard.html` provides a zero-latency view of the bots' raw JSON data directly from the `shared-data` folder.
+## What is not implemented yet
 
-## Project Metrics (Snapshot 2026-03-30)
+- normal client input and collision-aware locomotion
+- reliable melee raycasts and explicit hit events
+- crafting, inventory UI, building, upgrading, and respawn
+- visual screen capture or a human-equivalent camera observation
+- adversarial players and general Rust survival
+- language-model planning
 
-| Metric | Count |
-|--------|-------|
-| **Git-Tracked Files** | 2,540 |
-| **Total Lines of Code** | 197,032 |
-| **Active Bots** | 8 |
-| **GPU Target** | AMD Radeon RX 5700 XT |
+
+## Future autonomous NPC track
+
+The long-term goal is a modular Rust companion/NPC, not one monolithic LLM policy. After the one-bot PPO bridge is proven, add server-confirmed skills behind a behavior-tree or utility planner:
+
+1. perceive nearby entities and maintain a blackboard;
+2. navigate to resources and gather them;
+3. craft tools and equipment;
+4. choose legal building locations and construct a base;
+5. manage survival needs and threats;
+6. fight NPCs or players using dedicated combat controllers.
+
+PPO may improve individual skills such as aiming or navigation. Language-model planning is optional and belongs above these skills; it must not directly control every low-level movement tick.

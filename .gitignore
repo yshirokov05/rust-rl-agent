@@ -7,6 +7,8 @@ server/
 *.db
 tensorboard_logs_v2/
 venv/
+venv-dml/
+.venv*/
 __pycache__/
 *.log
 *.zip
@@ -20,6 +22,9 @@ node_modules/
 dist/
 build/
 .env
+wandb/
+.streamlit/credentials.toml
+artifacts/
 
 # TensorBoard run artifacts
 runs/

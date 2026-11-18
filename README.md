@@ -1,4 +1,4 @@
-# Vanguard RL: Autonomous Rust Agent
+# RustBot: Autonomous Rust Agent
 
 Training a PPO reinforcement learning agent to survive and navigate the open-world survival game Rust — using raw game telemetry, a custom C#/Oxide server plugin, and DirectML-accelerated PyTorch on an AMD GPU. The agent sees only what the game server sees: position vectors, inventory state, and semantic vision maps.
 
@@ -7,7 +7,6 @@ Training a PPO reinforcement learning agent to survive and navigate the open-wor
 [![DirectML](https://img.shields.io/badge/DirectML-AMD%20RX%205700%20XT-ED1C24?style=flat-square)](https://github.com/microsoft/DirectML)
 [![C#](https://img.shields.io/badge/C%23-Oxide%2FCarbon%20Plugin-239120?style=flat-square&logo=csharp)](https://umod.org/)
 [![SB3](https://img.shields.io/badge/Stable--Baselines3-PPO-FF6F61?style=flat-square)](https://stable-baselines3.readthedocs.io/)
-[![LOC](https://img.shields.io/badge/LOC-191%2C401-blue?style=flat-square)](.)
 
 ---
 
@@ -38,12 +37,11 @@ Training a PPO reinforcement learning agent to survive and navigate the open-wor
 
 ## Key Technical Highlights
 
-- **1.6M+ training timesteps** accumulated across multi-session training with full checkpoint persistence
-- **200+ SPS** (steps per second) — 6-way parallel environment using `SubprocVecEnv`, bypassing Python's GIL via `multiprocessing`
+- **Checkpoint persistence** so training can resume across sessions
+- **Parallel environments** — 6 workers using `SubprocVecEnv`, which runs each environment in its own process to get around Python's GIL
 - **ResNet18 vision extractor** processes semantic map inputs from the game server; feature vectors feed directly into the PPO policy head
 - **DirectML GPU acceleration** — targets AMD Radeon RX 5700 XT (8GB VRAM) via `torch_directml`; GPU config: `batch_size=256`, `n_steps=512`, `n_epochs=10` (~3.5GB VRAM utilization)
 - **C#/Python indexed handshake** — custom Oxide/Carbon plugin handles bot spawning, NavMesh navigation, and per-bot vision/action file exchange at 10 ticks/second with zero inter-worker collision
-- **191,401 lines of code** across 2,541 tracked files spanning the C# plugin, Python training stack, and server configuration
 - **Weights & Biases integration** — real-time cloud tracking of `live_step`, SPS, and resource harvesting achievements (Wood/Cloth collected per episode)
 - **Custom reward shaping** — `RewardShaper` class with heuristics for resource centering, tool usage (Rock/Hammer hold bonus), and survival duration scaling
 
@@ -60,7 +58,7 @@ rust-rl-agent/
 │   └── dashboard.py        # Local training monitor
 ├── server/                 # Rust dedicated server installation
 ├── rust-plugin/            # C# Carbon plugins
-│   ├── BotController.cs    # 8-bot spawner + action executor
+│   ├── BotController.cs    # Bot spawner + action executor
 │   └── AgentEyes.cs        # Vision broadcaster (position, inventory, heading)
 ├── shared-data/            # Live vision_N.json / actions_N.json exchange
 ├── models/                 # Saved PPO checkpoints
@@ -94,18 +92,15 @@ AMD GPU required for DirectML. For CUDA, swap `torch_directml` with standard `to
 
 ---
 
-## Training Metrics (as of 2026-03-30)
+## Training Configuration
 
 | Metric | Value |
 |---|---|
-| Total timesteps trained | 1,600,000+ |
-| Peak SPS | ~200 steps/sec |
 | Parallel environments | 6 (SubprocVecEnv) |
 | Batch size | 256 |
 | n_steps per rollout | 512 |
 | GPU | AMD RX 5700 XT (DirectML) |
 | VRAM usage | ~3.5 GB / 8 GB |
-| Tracked files | 2,541 |
 
 ---
 

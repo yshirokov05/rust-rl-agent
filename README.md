@@ -1,4 +1,4 @@
-# Vanguard RL: Autonomous Rust Agent
+# RustBot: Autonomous Rust Agent
 
 Training a PPO reinforcement learning agent to survive and navigate the open-world survival game Rust — using raw game telemetry, a custom C#/Oxide server plugin, and DirectML-accelerated PyTorch on an AMD GPU. The agent sees only what the game server sees: position vectors, inventory state, and semantic vision maps.
 
